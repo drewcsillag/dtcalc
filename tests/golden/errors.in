@@ -22,7 +22,15 @@ a < b < c
 now + 7h $
 nope(now)
 diff(now)
-trunc(now, 1mo)
+trunc(now, 1bd)
+trunc(today, 1h)
+trunc(today, 1mo1d)
+diff(today, now)
+unix(3h)
+today + tomorrow
+-today
+today * 2
+2026-12-24 in Atlantis
 :nope
 :fmt sideways
 :tz Atlantis

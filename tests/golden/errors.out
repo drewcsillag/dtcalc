@@ -94,10 +94,42 @@ dtcalc> diff(now)
 error: diff takes 2 arguments but was given 1
   diff(now)
   ^^^^^^^^^
-dtcalc> trunc(now, 1mo)
-error: trunc cannot use 1mo as a granularity for an instant: months and years have no fixed length, so there is nothing to round to
-  trunc(now, 1mo)
+dtcalc> trunc(now, 1bd)
+error: trunc cannot use 1bd as a granularity: a business day has no position within a month or a year to bucket by
+  trunc(now, 1bd)
   ^^^^^^^^^^^^^^^
+dtcalc> trunc(today, 1h)
+error: trunc cannot use 1h as a granularity for a date: a date has no time of day to round
+  trunc(today, 1h)
+  ^^^^^^^^^^^^^^^^
+dtcalc> trunc(today, 1mo1d)
+error: trunc needs a granularity in one ladder; 1mo1d mixes months with days, which have no fixed ratio
+  trunc(today, 1mo1d)
+  ^^^^^^^^^^^^^^^^^^^
+dtcalc> diff(today, now)
+error: diff needs both arguments to be the same kind; mixing a date with an instant leaves it ambiguous which calendar to decompose against
+  diff(today, now)
+  ^^^^^^^^^^^^^^^^
+dtcalc> unix(3h)
+error: unix needs a date or an instant, not a duration
+  unix(3h)
+  ^^^^^^^^
+dtcalc> today + tomorrow
+error: cannot add two points in time; subtract them to get the span between
+  today + tomorrow
+  ^^^^^^^^^^^^^^^^
+dtcalc> -today
+error: cannot negate a date
+  -today
+  ^^^^^^
+dtcalc> today * 2
+error: cannot multiply a date by a number
+  today * 2
+  ^^^^^^^^^
+dtcalc> 2026-12-24 in Atlantis
+error: unknown timezone 'Atlantis'
+  2026-12-24 in Atlantis
+  ^^^^^^^^^^^^^^^^^^^^^^
 dtcalc> :nope
 error: unknown command ':nope'; try :help
 dtcalc> :fmt sideways
