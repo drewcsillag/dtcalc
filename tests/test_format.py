@@ -83,7 +83,7 @@ def test_an_unknown_format_is_an_error() -> None:
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
-        (D(w=3, h=2, m=5), "3w2h5m"),
+        (D(w=3, h=2, m=5), "21d2h5m"),
         (D(h=24), "24h"),
         (D(), "0s"),
         (Number(8.0), "8"),

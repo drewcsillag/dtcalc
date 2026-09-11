@@ -216,7 +216,7 @@ def test_subtraction_across_a_fall_back_counts_the_extra_hour() -> None:
 def test_diff_decomposes_into_calendar_units() -> None:
     a = inst(NY, "2026-05-23T12:00:00")
     b = inst(NY, "2026-05-30T12:00:00")
-    assert str(a.diff(b)) == "1w"
+    assert str(a.diff(b)) == "7d"
 
 
 def test_diff_across_a_fall_back_still_reads_as_one_day() -> None:
@@ -235,7 +235,7 @@ def test_diff_mixes_months_days_and_hours() -> None:
 def test_diff_is_signed() -> None:
     a = inst(NY, "2026-05-23T12:00:00")
     b = inst(NY, "2026-05-30T12:00:00")
-    assert str(b.diff(a)) == "-1w"
+    assert str(b.diff(a)) == "-7d"
 
 
 def test_diff_of_an_instant_with_itself_is_zero() -> None:

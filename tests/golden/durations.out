@@ -15,11 +15,11 @@ dtcalc> 1m1.5s
 1m1.5s
 dtcalc> # Calendar days and weeks are their own ladder.
 dtcalc> 8d
-1w1d
+8d
 dtcalc> 7d
-1w
+7d
 dtcalc> 3w2h5m
-3w2h5m
+21d2h5m
 dtcalc> # So are months and years.
 dtcalc> 15mo
 1y3mo

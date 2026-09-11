@@ -84,7 +84,7 @@ The units form **four ladders that never convert into each other**:
 | Ladder | Units | Cascades |
 | --- | --- | --- |
 | exact | `ms` `s` `m` `h` | `90m` → `1h30m`, `3661s` → `1h1m1s` |
-| calendar days | `d` `w` | `8d` → `1w1d` |
+| calendar days | `d` `w` | `8d` → `8d`; see [week grouping](#week-grouping) |
 | calendar months | `mo` `y` | `15mo` → `1y3mo` |
 | business days | `bd` | Mon–Fri, no holidays |
 
@@ -250,7 +250,7 @@ be used as variable names.
 | `:vars` | list the variables |
 | `:zones <text>` | search timezone names |
 | `:tz <zone>` | set the display zone |
-| `:fmt <format>` and/or `<clock>` | `iso`, `human`, `unix`, `timeonly`; `24h`, `12h` |
+| `:fmt <format>`, `<clock>`, `<grouping>` | `iso`, `human`, `unix`, `timeonly`; `24h`, `12h`; `weeks`, `noweeks` |
 | `:q` | quit (so does Ctrl-D) |
 
 A leading `:` followed by a letter is a command; followed by a digit or
@@ -298,6 +298,22 @@ or for `--no-color`. The prompt itself is coloured only under GNU readline:
 libedit, which macOS ships, has no working way to mark escape sequences as
 zero-width, and counting them puts the cursor in the wrong column after
 Ctrl-A on a wrapped line.
+
+### Week grouping
+
+Days do **not** group into weeks by default, so a ten-day duration prints
+`10d`. `:fmt weeks` turns grouping on:
+
+```
+dtcalc> 10d
+10d
+dtcalc> :fmt weeks
+dtcalc> 10d
+1w3d
+```
+
+The toggle reaches the day ladder only — `15mo` is `1y3mo` either way,
+because years group more naturally than weeks do.
 
 ## Two decisions worth explaining
 

@@ -180,8 +180,8 @@ def test_a_negative_granularity_is_an_error(env: Env) -> None:
         ("ceil(97m, 15m)", "1h45m"),
         ("round(7m, 15m)", "0s"),
         ("ceil(1s, 1h)", "1h"),
-        ("trunc(10d, 1w)", "1w"),
-        ("ceil(10d, 1w)", "2w"),
+        ("trunc(10d, 1w)", "7d"),
+        ("ceil(10d, 1w)", "14d"),
         ("round(14mo, 1y)", "1y"),
         ("round(-97m, 15m)", "-1h30m"),
     ],
@@ -223,7 +223,7 @@ def test_diff_spans_months(env: Env) -> None:
 def test_diff_is_signed(env: Env) -> None:
     ev(env, "a = now")
     ev(env, "b = now + 7d")
-    assert dur(env, "diff(b, a)") == "-1w"
+    assert dur(env, "diff(b, a)") == "-7d"
 
 
 def test_epoch_builds_an_instant_from_unix_seconds(env: Env) -> None:

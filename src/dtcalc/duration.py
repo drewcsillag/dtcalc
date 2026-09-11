@@ -7,10 +7,16 @@ A duration is a quad — ``(months, days, bdays, millis)`` — holding four
 Ladder         Units          Cascades
 =============  =============  =========================================
 ``exact``      ms s m h       ``90m`` -> ``1h30m``; ``24h`` stays ``24h``
-``caldays``    d w            ``8d`` -> ``1w1d``
+``caldays``    d w            ``8d`` -> ``8d``; see week grouping below
 ``calmonths``  mo y           ``15mo`` -> ``1y3mo``
 ``bdays``      bd             its own ladder
 =============  =============  =========================================
+
+Days do **not** group into weeks by default, so ``10d`` prints ``10d``.
+Grouping is available on request -- :meth:`Duration.render` with
+``group_weeks=True``, which ``:fmt weeks`` selects -- and it applies to the
+day ladder only: ``15mo`` is ``1y3mo`` either way, because years group more
+naturally than weeks do.
 
 The separation is the whole point.  ``d`` means "same wall-clock time, next
 day", which is 23, 24 or 25 hours depending on where it lands, so promoting
@@ -297,9 +303,18 @@ class Duration:
     # ------------------------------------------------------------------
 
     def __str__(self) -> str:
+        return self.render()
+
+    def render(self, *, group_weeks: bool = False) -> str:
+        """Render the duration, optionally grouping days into weeks.
+
+        Grouping is off by default because days are the unit people mean when
+        they subtract two dates.  It is a rendering choice only: ``10d`` and
+        ``1w3d`` are the same value, and ``==`` agrees.
+        """
         groups = [
             _render_months(abs(self.months)),
-            _render_days(abs(self.days)),
+            _render_days(abs(self.days), group_weeks=group_weeks),
             f"{abs(self.bdays)}bd" if self.bdays else "",
             _render_exact(abs(self.millis)),
         ]
@@ -331,7 +346,9 @@ def _render_months(months: int) -> str:
     return (f"{years}y" if years else "") + (f"{rest}mo" if rest else "")
 
 
-def _render_days(days: int) -> str:
+def _render_days(days: int, *, group_weeks: bool) -> str:
+    if not group_weeks:
+        return f"{days}d" if days else ""
     weeks, rest = divmod(days, 7)
     return (f"{weeks}w" if weeks else "") + (f"{rest}d" if rest else "")
 

@@ -26,6 +26,19 @@ now
 1h30m
 :fmt iso 24h
 now
+# Week grouping: off by default, and it reaches the day ladder only.
+:fmt iso 24h
+10d
+8d
+3w2h5m
+:fmt weeks
+10d
+8d
+3w2h5m
+15mo
+24h
+:fmt noweeks
+10d
 # Durations, numbers and booleans are unaffected by either setting.
 :fmt timeonly 12h
 3w2h5m

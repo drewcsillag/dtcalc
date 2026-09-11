@@ -101,6 +101,6 @@ error: trunc cannot use 1mo as a granularity for an instant: months and years ha
 dtcalc> :nope
 error: unknown command ':nope'; try :help
 dtcalc> :fmt sideways
-error: unknown setting 'sideways'; formats are iso, human, unix, timeonly; clocks are 24h, 12h
+error: unknown setting 'sideways'; formats are iso, human, unix, timeonly; clocks are 24h, 12h; week grouping is noweeks or weeks
 dtcalc> :tz Atlantis
 error: unknown timezone 'Atlantis'

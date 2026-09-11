@@ -12,6 +12,10 @@ look the same in ``iso``, ``human`` and ``timeonly``.  The one exception is
 that mode is that everything coming out of it is a number a pipeline can
 consume.
 
+Week grouping is a display choice too: ``10d`` by default, ``1w3d`` when
+asked for.  It reaches the day ladder only -- ``15mo`` is ``1y3mo`` either
+way, because years group more naturally than weeks.
+
 ``timeonly`` drops the date, for arithmetic where the date is not the point.
 It appends a relative day marker when the result is not on today's date, so
 that ``now + 20h`` cannot silently look like a time this morning.  That
@@ -39,6 +43,7 @@ from dtcalc.values import Value, format_number
 __all__ = [
     "CLOCKS",
     "FORMATS",
+    "GROUPINGS",
     "Display",
     "Style",
     "choose_style",
@@ -48,6 +53,7 @@ __all__ = [
 
 FORMATS: Final = ("iso", "human", "unix", "timeonly")
 CLOCKS: Final = ("24h", "12h")
+GROUPINGS: Final = ("noweeks", "weeks")
 
 _MS_PER_SECOND: Final = 1000
 
@@ -63,6 +69,7 @@ class Display:
 
     fmt: str = "iso"
     clock: str = "24h"
+    group_weeks: bool = False
     today: date | None = None
 
 
@@ -135,8 +142,10 @@ def format_value(value: Value, display: Display | None = None) -> str:
 
     if isinstance(value, Instant):
         return _format_instant(value, settings)
-    if isinstance(value, Duration) and settings.fmt == "unix":
-        return format_number(_total_seconds(value))
+    if isinstance(value, Duration):
+        if settings.fmt == "unix":
+            return format_number(_total_seconds(value))
+        return value.render(group_weeks=settings.group_weeks)
     return str(value)
 
 
