@@ -1,0 +1,53 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    # The environment is the approval gate, and is also where PyPI's Trusted
+    # Publisher configuration is bound.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/dtcalc-cli
+
+    permissions:
+      # Required for Trusted Publishing: the job mints a short-lived OIDC
+      # token instead of using a stored API key.
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        # Pinned exactly: setup-uv publishes moving major tags only through v7.
+        uses: astral-sh/setup-uv@v10.1.0
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Check the tag matches the package version
+        # A release tagged v0.2.0 that builds 0.1.0 would publish silently and
+        # be unfixable, since PyPI does not allow re-uploading a version.
+        if: github.event_name == 'release'
+        run: |
+          version=$(uv run python -c 'import dtcalc; print(dtcalc.__version__)')
+          tag="${GITHUB_REF_NAME#v}"
+          echo "tag=$tag version=$version"
+          test "$tag" = "$version"
+
+      - name: Check
+        run: make check
+
+      - name: Build
+        run: uv build
+
+      - name: Validate the built metadata
+        run: uvx twine check --strict dist/*
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@v1.14.2

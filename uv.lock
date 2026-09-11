@@ -80,8 +80,7 @@ wheels = [
 ]
 
 [[package]]
-name = "dtcalc"
-version = "0.1.0"
+name = "dtcalc-cli"
 source = { editable = "." }
 
 [package.dev-dependencies]

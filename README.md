@@ -24,10 +24,15 @@ Pure Python, no runtime dependencies.
 ## Install
 
 ```sh
-uv tool install git+https://github.com/drewcsillag/dtcalc
+uv tool install dtcalc-cli          # or: pipx install dtcalc-cli
 ```
 
-Or from a clone: `uv tool install .`
+From a clone: `uv tool install .`  ·  From git:
+`uv tool install git+https://github.com/drewcsillag/dtcalc`
+
+The distribution is named **`dtcalc-cli`** because `dtcalc` was already taken
+on PyPI by an unrelated 2021 package. The command you run, and the package you
+import, are both still `dtcalc`.
 
 ## Running it
 
@@ -363,6 +368,12 @@ make install   # uv tool install --force .
 CI runs `make check` on Linux and macOS. Both are worth having: Linux uses
 GNU readline and macOS ships libedit, and the REPL's prompt handling has to
 differ between them.
+
+Releases publish to PyPI from a GitHub release via Trusted Publishing, so
+there is no API token anywhere. The version lives in `src/dtcalc/__init__.py`
+and the packaging metadata reads it from there, so `dtcalc --version` and the
+published version cannot drift; the release workflow additionally refuses to
+publish if the tag and the version disagree.
 
 Two debugging aids print the intermediate stages. The parser leaves colon
 literals undecided and a separate pass resolves them, so `--dump-ast` shows
