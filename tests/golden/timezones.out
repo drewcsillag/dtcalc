@@ -24,8 +24,8 @@ dtcalc> (now + 1d) in Tokyo
 dtcalc> :zones tokyo
 Asia/Tokyo
 dtcalc> :tz Tokyo
-display zone is now Asia/Tokyo
+working zone is now Asia/Tokyo
 dtcalc> now
 2026-05-24T01:15:13+09:00  Asia/Tokyo
 dtcalc> :tz nyc
-display zone is now America/New_York
+working zone is now America/New_York

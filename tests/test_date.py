@@ -241,3 +241,12 @@ def test_diff_and_subtraction_answer_different_questions() -> None:
     start, end = d("2026-01-15"), d("2026-02-18")
     assert str(end.days_since(start)) == "34d"
     assert str(start.diff(end)) == "1mo3d"
+
+
+def test_diff_is_invertible_in_both_directions() -> None:
+    """Regression, found by a property test. See the note in test_instant.py:
+    negating a months-plus-days duration is not its inverse, because month
+    steps clamp the day of month."""
+    a, b = d("2000-03-01"), d("2000-01-02")
+    assert b + b.diff(a) == a
+    assert a + a.diff(b) == b

@@ -17,8 +17,10 @@ Three modes:
 stdout instead of stderr, so a whole session can be captured as one stream.
 That is how the golden tests pin the user-visible output.
 
-``DTCALC_TZ`` and ``DTCALC_NOW`` override the display zone and freeze the
-clock.  They exist so that output can be made reproducible — the golden
+``--tz``, ``DTCALC_TZ`` and ``DTCALC_NOW`` set the working zone and freeze the
+clock.  It is the *working* zone, not merely a display zone: it governs the
+arithmetic too, so ``today`` differs between New York and UTC for the same
+instant.  They exist so that output can be made reproducible — the golden
 transcripts could not otherwise mention ``now``.
 """
 
@@ -69,6 +71,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--no-color", action="store_true", help="never colourise output")
     parser.add_argument(
+        "--tz",
+        metavar="ZONE",
+        help="the working zone for arithmetic and display; overrides DTCALC_TZ",
+    )
+    parser.add_argument(
         "--dump-tokens",
         metavar="EXPR",
         help="print the token stream for EXPR and exit (a debugging aid)",
@@ -92,7 +99,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _dump_ast(args.dump_ast)
 
     try:
-        env = build_env()
+        env = build_env(zone_override=args.tz)
     except DtcalcError as error:
         print(error.render(""), file=sys.stderr)
         return 1
@@ -115,23 +122,32 @@ def main(argv: Sequence[str] | None = None) -> int:
 # --------------------------------------------------------------------------
 
 
-def build_env() -> Env:
-    """Assemble the starting environment, honouring the test overrides.
+def build_env(*, zone_override: str | None = None) -> Env:
+    """Assemble the starting environment.
 
-    ``DTCALC_TZ`` is read first, because a bare ``DTCALC_NOW`` with no offset
+    The zone is resolved first, because a bare ``DTCALC_NOW`` with no offset
     is a wall-clock reading and needs a zone to be read in.
     """
-    zone = _display_zone()
+    zone = _working_zone(zone_override)
     return Env(clock=_clock(zone), zone=zone)
 
 
-def _display_zone() -> ZoneInfo:
-    override = os.environ.get(_TZ_ENV)
+def _working_zone(override: str | None) -> ZoneInfo:
+    """The zone all arithmetic happens in.
+
+    Precedence: ``--tz``, then ``DTCALC_TZ``, then the machine's local zone.
+    """
     if override:
         try:
             return resolve_zone(override)
         except DtcalcError as exc:
-            raise DtcalcError(f"{_TZ_ENV} is set to {override!r}: {exc.message}") from exc
+            raise DtcalcError(f"--tz {override!r}: {exc.message}") from exc
+    from_env = os.environ.get(_TZ_ENV)
+    if from_env:
+        try:
+            return resolve_zone(from_env)
+        except DtcalcError as exc:
+            raise DtcalcError(f"{_TZ_ENV} is set to {from_env!r}: {exc.message}") from exc
     return local_zone()
 
 

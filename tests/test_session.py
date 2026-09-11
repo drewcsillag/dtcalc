@@ -79,7 +79,7 @@ def test_vars_lists_what_is_set(env: Env) -> None:
     run(env, "bb = 1d")
     outcome, lines = run(env, ":vars")
     assert outcome is Outcome.OK
-    assert lines == ["a   3h", "bb  1d"]
+    assert lines == ["a   duration  3h", "bb  duration  1d"]
 
 
 def test_zones_searches(env: Env) -> None:
@@ -105,13 +105,13 @@ def test_zones_needs_an_argument(env: Env) -> None:
 
 
 def test_tz_reports_the_current_zone(env: Env) -> None:
-    assert run(env, ":tz") == (Outcome.OK, ["display zone is America/New_York"])
+    assert run(env, ":tz") == (Outcome.OK, ["working zone is America/New_York"])
 
 
 def test_tz_sets_the_zone_and_affects_later_results(env: Env) -> None:
     outcome, lines = run(env, ":tz Tokyo")
     assert outcome is Outcome.OK
-    assert lines == ["display zone is now Asia/Tokyo"]
+    assert lines == ["working zone is now Asia/Tokyo"]
     _, result = run(env, "now")
     assert "Asia/Tokyo" in result[0]
 
@@ -242,7 +242,7 @@ def test_vars_uses_the_current_format(env: Env) -> None:
     run(env, "a = now")
     run(env, ":fmt timeonly")
     _, lines = run(env, ":vars")
-    assert lines == ["a  12:15:13 EDT"]
+    assert lines == ["a  instant  12:15:13 EDT"]
 
 
 # --------------------------------------------------------------------------
@@ -302,3 +302,65 @@ def test_an_unknown_word_names_all_three_categories(env: Env) -> None:
 
 def test_help_mentions_the_week_toggle(env: Env) -> None:
     assert any("weeks" in line for line in help_text())
+
+
+# --------------------------------------------------------------------------
+# 6.2  the :vars type column
+# --------------------------------------------------------------------------
+
+
+def test_vars_names_each_value_kind(env: Env) -> None:
+    """A date and a midnight instant can look alike now, so the listing says
+    which is which."""
+    run(env, "birthday = 2026-12-24")
+    run(env, "deploy = 2026-07-04T16:00")
+    run(env, "gap = 5h")
+    run(env, "ok = 1h < 2h")
+    run(env, "count = 2h / 15m")
+    outcome, lines = run(env, ":vars")
+    assert outcome is Outcome.OK
+    assert lines == [
+        "birthday  date      2026-12-24",
+        "count     number    8",
+        "deploy    instant   2026-07-04T16:00:00-04:00  America/New_York",
+        "gap       duration  5h",
+        "ok        boolean   true",
+    ]
+
+
+def test_vars_distinguishes_a_date_from_a_midnight_instant(env: Env) -> None:
+    run(env, "a = 2026-12-24")
+    run(env, "b = 2026-12-24T00:00")
+    _, lines = run(env, ":vars")
+    assert "date" in lines[0]
+    assert "instant" in lines[1]
+
+
+def test_vars_when_empty_is_unchanged(env: Env) -> None:
+    assert run(env, ":vars") == (Outcome.OK, ["(no variables set)"])
+
+
+# --------------------------------------------------------------------------
+# 6.3  the working-zone rename
+# --------------------------------------------------------------------------
+
+
+def test_tz_calls_it_the_working_zone(env: Env) -> None:
+    """It governs the arithmetic, not just the rendering: the same instant is
+    a different `today` in each zone. Calling it the display zone hid that."""
+    assert run(env, ":tz") == (Outcome.OK, ["working zone is America/New_York"])
+    outcome, lines = run(env, ":tz Tokyo")
+    assert outcome is Outcome.OK
+    assert lines == ["working zone is now Asia/Tokyo"]
+
+
+def test_the_working_zone_changes_what_today_means(env: Env) -> None:
+    _, before = run(env, "today")
+    run(env, ":tz UTC")
+    _, after = run(env, "today")
+    assert before == ["2026-05-23"]
+    assert after == ["2026-05-23"]  # same date at this hour; the zone still governs
+
+
+def test_help_calls_it_the_working_zone() -> None:
+    assert any("working zone" in line for line in help_text())

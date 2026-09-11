@@ -16,6 +16,11 @@ Week grouping is a display choice too: ``10d`` by default, ``1w3d`` when
 asked for.  It reaches the day ladder only -- ``15mo`` is ``1y3mo`` either
 way, because years group more naturally than weeks.
 
+A **date** renders as a plain ``2026-12-24``: no clock, no zone, and neither
+the clock nor the week setting touches it.  ``unix`` is the one exception,
+where it has to take midnight in the working zone, because asking for an
+epoch is an explicit request for a moment.
+
 ``timeonly`` drops the date, for arithmetic where the date is not the point.
 It appends a relative day marker when the result is not on today's date, so
 that ``now + 20h`` cannot silently look like a time this morning.  That
@@ -34,7 +39,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import IO, Final
+from zoneinfo import ZoneInfo
 
+from dtcalc.date import Date
 from dtcalc.duration import Duration
 from dtcalc.errors import DtcalcError
 from dtcalc.instant import Instant
@@ -71,6 +78,10 @@ class Display:
     clock: str = "24h"
     group_weeks: bool = False
     today: date | None = None
+    # The working zone. Needed because a date has no zone of its own, and
+    # `unix` has to pick one to take midnight in. Supplied as an input so the
+    # formatter stays a pure function, the same reason `today` is.
+    zone: ZoneInfo | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,6 +151,8 @@ def format_value(value: Value, display: Display | None = None) -> str:
             f"unknown clock {settings.clock!r}; the ones there are: {', '.join(CLOCKS)}"
         )
 
+    if isinstance(value, Date):
+        return _format_date(value, settings)
     if isinstance(value, Instant):
         return _format_instant(value, settings)
     if isinstance(value, Duration):
@@ -155,6 +168,24 @@ def render(value: Value, display: Display | None = None) -> list[str]:
     if isinstance(value, Instant) and value.note is not None:
         lines.append(value.note)
     return lines
+
+
+def _format_date(value: Date, display: Display) -> str:
+    """Render a date.
+
+    The clock and week settings do not apply: a date has no time of day and no
+    day ladder of its own.  ``timeonly`` shows the date, because that mode
+    exists to suppress the date on *instants* and here there is nothing else.
+    """
+    match display.fmt:
+        case "human":
+            return value.to_std().strftime("%a %Y-%m-%d")
+        case "unix":
+            if display.zone is None:
+                raise DtcalcError("a date has no epoch without a zone; set one with :tz")
+            return format_number(value.at_midnight(display.zone).moment.timestamp())
+        case _:
+            return str(value)
 
 
 def _format_instant(value: Instant, display: Display) -> str:

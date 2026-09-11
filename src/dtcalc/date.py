@@ -139,9 +139,11 @@ class Date:
         it: ``1mo3d`` rather than ``34d``.  Plain subtraction answers the
         other question.
         """
-        if other < self:
-            return -other.diff(self)
-        months = _greedy(lambda n: self + Duration(months=n), other)
+        # Each direction is decomposed on its own. Negating the forward
+        # answer is *not* the inverse: month steps clamp the day of month, so
+        # Jan 2 +1mo +28d is Mar 1 while Mar 1 -1mo -28d is Jan 4.
+        sign = 1 if other >= self else -1
+        months = sign * _greedy(lambda n: self + Duration(months=sign * n), other, ahead=sign > 0)
         after_months = self + Duration(months=months)
         days = (other.to_std() - after_months.to_std()).days
         return Duration(months=months, days=days)
@@ -184,12 +186,16 @@ def _add_business_days(value: StdDate, bdays: int) -> StdDate:
     return current
 
 
-def _greedy(build: Callable[[int], Date], target: Date) -> int:
-    """Largest ``n >= 0`` with ``build(n) <= target``, doubling then bisecting."""
+def _greedy(build: Callable[[int], Date], target: Date, *, ahead: bool) -> int:
+    """Largest ``n >= 0`` that does not overshoot ``target``.
+
+    ``ahead`` says which way we are walking: forwards, ``build(n)`` must stay
+    at or before the target; backwards, at or after it.
+    """
 
     def fits(n: int) -> bool:
         try:
-            return build(n) <= target
+            return build(n) <= target if ahead else build(n) >= target
         except DtcalcError:
             return False
 

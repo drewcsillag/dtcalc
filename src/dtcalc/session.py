@@ -20,6 +20,7 @@ from dtcalc.errors import DtcalcError
 from dtcalc.evaluator import evaluate_line
 from dtcalc.format import CLOCKS, FORMATS, GROUPINGS, Style, format_value, render
 from dtcalc.lexer import is_meta_command, tokenize
+from dtcalc.values import kind_of
 from dtcalc.zones import resolve_zone, search_zones
 
 __all__ = ["Outcome", "Result", "execute_line", "help_text"]
@@ -98,12 +99,22 @@ def _meta(line: str, env: Env, style: Style) -> Result:
 
 
 def _list_variables(env: Env) -> list[str]:
+    """List the variables, naming each kind.
+
+    The kind column exists because a date and a midnight instant can now look
+    alike; without it the listing would not say which you had.
+    """
     if not env.variables:
         return ["(no variables set)"]
-    width = max(len(name) for name in env.variables)
-    return [
-        f"{name:<{width}}  {format_value(value, env.display())}"
+    display = env.display()
+    rows = [
+        (name, str(kind_of(value)), format_value(value, display))
         for name, value in sorted(env.variables.items())
+    ]
+    name_width = max(len(name) for name, _, _ in rows)
+    kind_width = max(len(kind) for _, kind, _ in rows)
+    return [
+        f"{name:<{name_width}}  {kind:<{kind_width}}  {rendered}" for name, kind, rendered in rows
     ]
 
 
@@ -124,13 +135,19 @@ def _zones(substring: str, style: Style) -> Result:
 
 
 def _set_zone(name: str, env: Env, style: Style) -> Result:
+    """Set the working zone.
+
+    Called the *working* zone rather than the display zone because it governs
+    the arithmetic as well: the same instant is a different ``today`` in New
+    York and in UTC.  The old wording hid a capability people then asked for.
+    """
     if not name:
-        return Result(Outcome.OK, (f"display zone is {env.zone}",))
+        return Result(Outcome.OK, (f"working zone is {env.zone}",))
     try:
         env.zone = resolve_zone(name)
     except DtcalcError as error:
         return Result(Outcome.ERROR, (style.error(f"error: {error.message}"),))
-    return Result(Outcome.OK, (f"display zone is now {env.zone}",))
+    return Result(Outcome.OK, (f"working zone is now {env.zone}",))
 
 
 def _set_format(argument: str, env: Env, style: Style) -> Result:
@@ -185,7 +202,10 @@ def _describe_format(env: Env, *, changed: bool = False) -> str:
 def help_text() -> list[str]:
     """The ``:help`` output, which doubles as the language's cheat sheet."""
     return [
-        "values      instants, durations, numbers, booleans",
+        "values      dates, instants, durations, numbers, booleans",
+        "dates       2026-12-24, today, tomorrow, upcoming friday, previous 15th.",
+        "            A date stays a date under +1d/+1mo/+3bd and becomes an",
+        "            instant once a time or a zone is named (@ 4p, in Tokyo).",
         "instants    now, today, tomorrow, yesterday, 2026-05-23T12:15:13,",
         "            2026-05-23, today 09:00, upcoming friday, previous 15th,",
         "            epoch(1789073107), epochms(...)",
@@ -202,7 +222,7 @@ def help_text() -> list[str]:
         "ladders     ms/s/m/h are exact; d/w and mo/y are calendar; bd is business",
         "            days.  They never convert, so 8h * 3 is 24h and never 1d.",
         "            Days do not group into weeks unless you ask (:fmt weeks).",
-        "commands    :help  :vars  :zones <text>  :tz <zone>  :q",
+        "commands    :help  :vars  :zones <text>  :tz <working zone>  :q",
         "            :fmt iso|human|unix|timeonly, 24h|12h, weeks|noweeks",
         "            (the clock applies to human and timeonly, not to iso;",
         "             weeks groups days, so 10d shows as 1w3d)",

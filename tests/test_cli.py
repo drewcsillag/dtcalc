@@ -192,3 +192,43 @@ def _feed(monkeypatch: pytest.MonkeyPatch, text: str) -> None:
             return False
 
     monkeypatch.setattr("sys.stdin", _Pipe(text))
+
+
+# --------------------------------------------------------------------------
+# 6.3  the --tz flag
+# --------------------------------------------------------------------------
+
+
+def test_tz_flag_sets_the_working_zone(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--tz", "Asia/Tokyo", "now"]) == 0
+    assert "Asia/Tokyo" in capsys.readouterr().out
+
+
+def test_tz_flag_accepts_an_alias(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--tz", "sf", "now"]) == 0
+    assert "America/Los_Angeles" in capsys.readouterr().out
+
+
+def test_tz_flag_beats_the_environment_variable(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Precedence: flag, then DTCALC_TZ, then the detected local zone."""
+    monkeypatch.setenv("DTCALC_TZ", "America/New_York")
+    assert main(["--tz", "UTC", "now"]) == 0
+    assert "UTC" in capsys.readouterr().out
+
+
+def test_tz_flag_governs_the_arithmetic_not_only_the_rendering(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The point of the rename: `today` differs by zone at this hour."""
+    monkeypatch.setenv("DTCALC_NOW", "2026-05-24T02:15:00+00:00")
+    assert main(["--tz", "America/New_York", "today"]) == 0
+    assert capsys.readouterr().out.strip() == "2026-05-23"
+    assert main(["--tz", "UTC", "today"]) == 0
+    assert capsys.readouterr().out.strip() == "2026-05-24"
+
+
+def test_a_bad_tz_flag_is_reported(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--tz", "Atlantis", "now"]) == 1
+    assert "Atlantis" in capsys.readouterr().err

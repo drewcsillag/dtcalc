@@ -255,3 +255,60 @@ def test_an_unknown_clock_setting_is_an_error() -> None:
 def test_timeonly_without_a_reference_date_omits_the_marker() -> None:
     """A formatter with no notion of today still prints something sensible."""
     assert format_value(inst("2026-05-24T07:00:00"), Display(fmt="timeonly")) == "07:00:00 EDT"
+
+
+# --------------------------------------------------------------------------
+# 6.1  rendering a date
+# --------------------------------------------------------------------------
+
+from dtcalc.date import Date  # noqa: E402
+
+
+def show_date(iso: str, **kwargs: object) -> str:
+    display = Display(today=TODAY, **kwargs)  # type: ignore[arg-type]
+    return format_value(Date.from_iso(iso), display)
+
+
+@pytest.mark.parametrize(
+    ("fmt", "expected"),
+    [
+        ("iso", "2026-12-24"),
+        ("human", "Thu 2026-12-24"),
+        # timeonly exists to suppress the date on *instants*; a date has
+        # nothing to suppress, so the date is all there is to show.
+        ("timeonly", "2026-12-24"),
+    ],
+)
+def test_a_date_renders_without_inventing_a_time(fmt: str, expected: str) -> None:
+    assert show_date("2026-12-24", fmt=fmt) == expected
+
+
+def test_unix_gives_midnight_in_the_working_zone() -> None:
+    """The one place a date acquires a zone implicitly, because asking for an
+    epoch is an explicit request for a moment."""
+    assert show_date("2026-12-24", fmt="unix", zone=NY) == "1798088400"
+
+
+def test_unix_of_a_date_depends_on_the_working_zone() -> None:
+    assert show_date("2026-12-24", fmt="unix", zone=NY) != show_date(
+        "2026-12-24", fmt="unix", zone=TOKYO
+    )
+
+
+@pytest.mark.parametrize("clock", ["12h", "24h"])
+@pytest.mark.parametrize("group_weeks", [True, False])
+def test_neither_the_clock_nor_the_week_setting_touches_a_date(
+    clock: str, group_weeks: bool
+) -> None:
+    """A date has no time of day and no day ladder of its own."""
+    assert show_date("2026-12-24", clock=clock, group_weeks=group_weeks) == "2026-12-24"
+
+
+def test_the_day_marker_does_not_apply_to_a_date() -> None:
+    """`(+1d)` exists so a time cannot hide a rollover. A date shows its own
+    date, so there is nothing to hide."""
+    assert show_date("2026-12-30", fmt="timeonly") == "2026-12-30"
+
+
+def test_render_of_a_date_is_a_single_line() -> None:
+    assert render(Date.from_iso("2026-12-24"), Display(today=TODAY)) == ["2026-12-24"]
