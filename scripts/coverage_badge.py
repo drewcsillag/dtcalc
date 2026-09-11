@@ -13,12 +13,19 @@ Honesty is enforced asymmetrically, which is the point of the design:
   build. It prints a nudge to regenerate instead.
 * ``--check`` also fails when coverage falls below the floor, so it cannot rot
   quietly between badge updates.
+
+The badge reports coverage **floored to a whole percent**. Exact coverage
+differs a little between platforms -- Linux uses GNU readline and macOS ships
+libedit, so different branches of the REPL run -- and a badge generated on one
+would otherwise overstate on the other. Flooring absorbs that drift while
+keeping the badge's claim true on every platform.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -34,8 +41,9 @@ COLOURS: tuple[tuple[float, str], ...] = (
     (0.0, "red"),
 )
 
-# Understating by more than this is worth a nudge, but never a failure.
-STALE_TOLERANCE = 0.5
+# The badge is floored to a whole percent, so it normally understates by up to
+# one point. Only a larger gap is worth a nudge, and never a failure.
+STALE_TOLERANCE = 1.0
 
 
 def colour_for(percent: float) -> str:
@@ -64,12 +72,19 @@ def badge_percent(path: Path) -> float | None:
 
 
 def write_badge(path: Path, percent: float) -> None:
+    """Write the badge, flooring to a whole percent.
+
+    Flooring is what makes the file portable: the claim stays true even on a
+    platform that measures a few tenths lower than the one it was generated
+    on.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
+    floored = float(math.floor(percent))
     badge = {
         "schemaVersion": 1,
         "label": "coverage",
-        "message": f"{percent:.1f}%",
-        "color": colour_for(percent),
+        "message": f"{floored:.0f}%",
+        "color": colour_for(floored),
     }
     path.write_text(json.dumps(badge, indent=2) + "\n")
 
@@ -95,7 +110,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.check:
         write_badge(args.badge, actual)
-        print(f"coverage {actual:.1f}% -> {args.badge}")
+        claimed = badge_percent(args.badge)
+        assert claimed is not None
+        print(f"coverage {actual:.1f}%, badge says {claimed:.0f}% -> {args.badge}")
         return 0
 
     status = 0

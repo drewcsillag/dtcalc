@@ -41,15 +41,37 @@ def test_write_badge_produces_a_shields_endpoint_payload(tmp_path: Path) -> None
     assert payload == {
         "schemaVersion": 1,
         "label": "coverage",
-        "message": "93.7%",
+        "message": "93%",
         "color": "green",
     }
+
+
+@pytest.mark.parametrize(
+    ("measured", "shown"),
+    [(93.7, "93%"), (93.0, "93%"), (99.99, "99%"), (100.0, "100%"), (0.4, "0%")],
+)
+def test_the_badge_floors_to_a_whole_percent(tmp_path: Path, measured: float, shown: str) -> None:
+    """Exact coverage differs between platforms -- Linux uses GNU readline and
+    macOS ships libedit, so different REPL branches run. Flooring keeps the
+    badge's claim true wherever it was generated."""
+    badge = tmp_path / "coverage.json"
+    write_badge(badge, measured)
+    assert json.loads(badge.read_text())["message"] == shown
+
+
+def test_flooring_means_the_badge_never_overstates(tmp_path: Path) -> None:
+    badge = tmp_path / "coverage.json"
+    for measured in (90.0, 90.9, 93.7, 99.9):
+        write_badge(badge, measured)
+        claimed = badge_percent(badge)
+        assert claimed is not None
+        assert claimed <= measured
 
 
 def test_badge_percent_reads_back_what_was_written(tmp_path: Path) -> None:
     badge = tmp_path / "coverage.json"
     write_badge(badge, 88.25)
-    assert badge_percent(badge) == 88.2
+    assert badge_percent(badge) == 88.0
 
 
 def test_badge_percent_of_a_missing_or_broken_file_is_none(tmp_path: Path) -> None:
@@ -82,7 +104,15 @@ def run_check(tmp_path: Path, actual: float, claimed: float, floor: float = 90.0
 
 
 def test_a_consistent_badge_passes(tmp_path: Path) -> None:
-    assert run_check(tmp_path, actual=93.7, claimed=93.7) == 0
+    assert run_check(tmp_path, actual=93.7, claimed=93.0) == 0
+
+
+def test_a_badge_generated_on_a_slightly_higher_platform_still_passes(
+    tmp_path: Path,
+) -> None:
+    """The case that flooring exists for: generated at 93.7 on macOS, checked
+    against 93.4 on Linux. The badge says 93%, which is still true."""
+    assert run_check(tmp_path, actual=93.4, claimed=93.7) == 0
 
 
 def test_a_badge_that_overstates_fails(tmp_path: Path) -> None:
@@ -118,16 +148,20 @@ def test_a_missing_badge_fails_the_check(tmp_path: Path) -> None:
     )
 
 
-def test_generate_mode_writes_the_measured_value(tmp_path: Path) -> None:
+def test_generate_mode_writes_the_floored_measured_value(tmp_path: Path) -> None:
     badge = tmp_path / "badge.json"
     assert main(["--report", str(report(tmp_path, 91.234)), "--badge", str(badge)]) == 0
-    assert badge_percent(badge) == 91.2
+    assert badge_percent(badge) == 91.0
 
 
 def test_the_committed_badge_matches_the_repository_state() -> None:
-    """The badge in the repo is readable and plausible."""
-    committed = Path(".github/badges/coverage.json")
-    assert committed.exists()
+    """The badge in the repo is readable and plausible.
+
+    Located relative to this file rather than the working directory, so the
+    test does not depend on where pytest was invoked from.
+    """
+    committed = Path(__file__).resolve().parent.parent / ".github/badges/coverage.json"
+    assert committed.exists(), f"no badge at {committed}"
     percent = badge_percent(committed)
     assert percent is not None
     assert 0.0 <= percent <= 100.0
