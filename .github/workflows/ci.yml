@@ -47,8 +47,17 @@ jobs:
       - name: Type-check
         run: make types
 
+      # Coverage runs on one platform only: measuring twice would double the
+      # work without telling us anything new. Keeping it inside this job means
+      # the existing required status check enforces the coverage floor, with
+      # no extra branch-protection rule to maintain.
       - name: Test
+        if: matrix.os == 'macos-latest'
         run: make test
+
+      - name: Test with coverage
+        if: matrix.os == 'ubuntu-latest'
+        run: make coverage-check
 
       - name: Smoke-test the installed console script
         env:

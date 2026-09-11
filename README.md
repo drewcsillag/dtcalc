@@ -1,6 +1,7 @@
 # dtcalc
 
 [![CI](https://github.com/drewcsillag/dtcalc/actions/workflows/ci.yml/badge.svg)](https://github.com/drewcsillag/dtcalc/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdrewcsillag%2Fdtcalc%2Fmain%2F.github%2Fbadges%2Fcoverage.json)](https://github.com/drewcsillag/dtcalc/actions/workflows/ci.yml)
 
 An interactive REPL for date, time, duration and timezone calculations.
 
@@ -361,9 +362,21 @@ of the two.
 
 ```sh
 make check     # ruff + mypy --strict + pytest
+make coverage  # measure coverage and refresh the README badge
 make fmt       # format and autofix
 make install   # uv tool install --force .
 ```
+
+The coverage badge is a JSON file committed under `.github/badges/`, which
+shields.io reads — no third-party coverage service and no token in CI. CI
+fails if that file claims **more** coverage than was measured, or if coverage
+drops below its floor. A badge that understates only prints a nudge, so
+improving coverage never breaks the build.
+
+`make coverage` measures the pty-driven subprocess too. The interactive tests
+spawn a real `python -m dtcalc`, and without `COVERAGE_PROCESS_START` those
+lines are invisible — `repl.py` reads as 56% covered when it is actually
+exercised end to end.
 
 CI runs `make check` on Linux and macOS. Both are worth having: Linux uses
 GNU readline and macOS ships libedit, and the REPL's prompt handling has to
