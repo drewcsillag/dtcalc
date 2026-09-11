@@ -1,5 +1,7 @@
 # dtcalc
 
+[![CI](https://github.com/drewcsillag/dtcalc/actions/workflows/ci.yml/badge.svg)](https://github.com/drewcsillag/dtcalc/actions/workflows/ci.yml)
+
 An interactive REPL for date, time, duration and timezone calculations.
 
 ```
@@ -357,6 +359,10 @@ make check     # ruff + mypy --strict + pytest
 make fmt       # format and autofix
 make install   # uv tool install --force .
 ```
+
+CI runs `make check` on Linux and macOS. Both are worth having: Linux uses
+GNU readline and macOS ships libedit, and the REPL's prompt handling has to
+differ between them.
 
 Two debugging aids print the intermediate stages. The parser leaves colon
 literals undecided and a separate pass resolves them, so `--dump-ast` shows
