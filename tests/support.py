@@ -9,7 +9,9 @@ from __future__ import annotations
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-__all__ = ["NY", "TEST_NOW", "TOKYO", "UTC_ZONE", "at"]
+from dtcalc.date import Date
+
+__all__ = ["NY", "TEST_NOW", "TOKYO", "UTC_ZONE", "at", "d"]
 
 NY = ZoneInfo("America/New_York")
 TOKYO = ZoneInfo("Asia/Tokyo")
@@ -24,3 +26,12 @@ TEST_NOW = datetime(2026, 5, 23, 12, 15, 13, tzinfo=NY)
 def at(zone: ZoneInfo, iso: str) -> datetime:
     """Build an aware datetime from an ISO string interpreted in ``zone``."""
     return datetime.fromisoformat(iso).replace(tzinfo=zone)
+
+
+def d(iso: str) -> Date:
+    """Build a :class:`~dtcalc.date.Date` from ``YYYY-MM-DD``.
+
+    Here rather than in each test module so the suite spells a date one way —
+    the same reasoning that put the frozen clock in ``conftest.py``.
+    """
+    return Date.from_iso(iso)

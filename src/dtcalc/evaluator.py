@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import calendar
 from collections.abc import Callable
-from datetime import date as Date
+from datetime import date as StdDate
 from datetime import datetime, time, timedelta, timezone
-from typing import Final
+from typing import Final, assert_never
 from zoneinfo import ZoneInfo
 
 from dtcalc.ast import (
@@ -32,6 +32,7 @@ from dtcalc.ast import (
     VarRef,
     WeekdayRef,
 )
+from dtcalc.date import Date
 from dtcalc.duration import Duration
 from dtcalc.env import Env
 from dtcalc.errors import DtcalcError
@@ -152,20 +153,20 @@ class _Evaluator:
     # dates and times
     # ------------------------------------------------------------------
 
-    def _today(self) -> Date:
+    def _today(self) -> StdDate:
         return self._now.astimezone(self._env.zone).date()
 
-    def _midnight(self, day: Date) -> Instant:
+    def _midnight(self, day: StdDate) -> Instant:
         return Instant.from_wall_clock(self._env.zone, datetime.combine(day, time()), strict=False)
 
-    def _at_time(self, day: Date, reading: TimeOfDay) -> Instant:
+    def _at_time(self, day: StdDate, reading: TimeOfDay) -> Instant:
         wall = datetime.combine(
             day,
             time(reading.hour, reading.minute, reading.second, reading.microsecond),
         )
         return Instant.from_wall_clock(self._env.zone, wall, strict=False)
 
-    def _weekday_date(self, direction: str, weekday: int) -> Date:
+    def _weekday_date(self, direction: str, weekday: int) -> StdDate:
         """The nearest such weekday, strictly after or before today.
 
         Strictly: asking for ``upcoming friday`` on a Friday gives next week's,
@@ -178,7 +179,7 @@ class _Evaluator:
         delta = (today.weekday() - weekday) % _DAYS_PER_WEEK or _DAYS_PER_WEEK
         return today - timedelta(days=delta)
 
-    def _ordinal_date(self, direction: str, day: int, node: Node) -> Date:
+    def _ordinal_date(self, direction: str, day: int, node: Node) -> StdDate:
         """The nearest such day of the month, strictly after or before today.
 
         Months that do not have the day are skipped, so the next 31st after
@@ -189,7 +190,7 @@ class _Evaluator:
         year, month = today.year, today.month
         for _ in range(_MAX_MONTHS_SEARCHED):
             if day <= calendar.monthrange(year, month)[1]:
-                candidate = Date(year, month, day)
+                candidate = StdDate(year, month, day)
                 if (candidate > today) if step > 0 else (candidate < today):
                     return candidate
             month += step
@@ -240,7 +241,14 @@ _COMPARISONS: Final = {"<", "<=", ">", ">=", "==", "!="}
 
 
 def _describe(value: Value) -> str:
+    """A value's kind, for error messages.
+
+    Exhaustive over the ``Value`` union by ``assert_never``, so a new value
+    type cannot reach a user as "a <unknown>".
+    """
     match value:
+        case Date():
+            return "a date"
         case Instant():
             return "an instant"
         case Duration():
@@ -249,6 +257,8 @@ def _describe(value: Value) -> str:
             return "a number"
         case Boolean():
             return "a boolean"
+        case _ as unhandled:
+            assert_never(unhandled)
 
 
 def _binary(op: str, left: Value, right: Value, node: Node) -> Value:

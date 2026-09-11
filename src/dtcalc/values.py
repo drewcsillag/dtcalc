@@ -10,8 +10,10 @@ own its own rendering — which matters because ``bool`` is a subclass of
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import assert_never
 
 from dtcalc.builtins import Kind
+from dtcalc.date import Date
 from dtcalc.duration import Duration
 from dtcalc.instant import Instant
 
@@ -49,12 +51,20 @@ class Boolean:
         return "true" if self.value else "false"
 
 
-type Value = Instant | Duration | Number | Boolean
+type Value = Date | Instant | Duration | Number | Boolean
 
 
 def kind_of(value: Value) -> Kind:
-    """The static kind of a runtime value."""
+    """The static kind of a runtime value.
+
+    The ``assert_never`` is load-bearing: ``Value`` is a union, so mypy
+    rejects this function outright if a member is left unhandled.  Adding a
+    value type is therefore a type error at every such site rather than a
+    surprise at runtime.
+    """
     match value:
+        case Date():
+            return Kind.DATE
         case Instant():
             return Kind.INSTANT
         case Duration():
@@ -63,3 +73,5 @@ def kind_of(value: Value) -> Kind:
             return Kind.NUMBER
         case Boolean():
             return Kind.BOOLEAN
+        case _ as unhandled:
+            assert_never(unhandled)

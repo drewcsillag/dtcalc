@@ -79,19 +79,16 @@ def _infer(node: Node, types: Types) -> Kind | None:
             return Kind.NUMBER
         case DurationLit():
             return Kind.DURATION
+        case DateTimeLit(literal=literal):
+            # The lexer already told us which it is.
+            return Kind.INSTANT if literal.has_time else Kind.DATE
+        case DayKeyword() | WeekdayRef() | OrdinalRef():
+            return Kind.DATE
         case ColonLit(literal=literal):
             return Kind.DURATION if literal.forced_duration else None
-        case (
-            TimeOfDay()
-            | DateTimeLit()
-            | NowLit()
-            | DayKeyword()
-            | WeekdayRef()
-            | OrdinalRef()
-            | DateAtTime()
-            | Attach()
-            | Convert()
-        ):
+        case TimeOfDay() | NowLit() | DateAtTime() | Attach() | Convert():
+            # Naming a time or a zone always lands on an instant, including
+            # when the thing named was a date.
             return Kind.INSTANT
         case VarRef(name=name):
             return _lookup(node, name, types)
@@ -112,16 +109,32 @@ def _infer(node: Node, types: Types) -> Kind | None:
             raise AssertionError(f"unhandled node {node!r}")
 
 
+# Kinds that denote a point on the calendar, and so behave alike for every
+# decision resolution makes.
+_MOMENTS: Final = (Kind.DATE, Kind.INSTANT)
+
+
+def _article(kind: Kind) -> str:
+    """``an instant``, ``a date``. Hardcoding "a" produced "a instant"."""
+    return f"an {kind}" if str(kind)[0] in "aeiou" else f"a {kind}"
+
+
 def _infer_binary(op: str, left: Kind | None, right: Kind | None) -> Kind | None:
     if op in {"<", "<=", ">", ">=", "==", "!="}:
         return Kind.BOOLEAN
     if op == "+":
-        if Kind.INSTANT in (left, right):
+        # `date + duration` is a date or an instant depending on the
+        # duration's *value*, which static inference cannot see. Answering
+        # INSTANT is safe rather than a guess: every decision this inference
+        # feeds -- colon-literal resolution, the provable type errors --
+        # treats dates and instants identically, and the evaluator applies
+        # the real rule.
+        if left in _MOMENTS or right in _MOMENTS:
             return Kind.INSTANT
         return Kind.DURATION
     if op == "-":
-        if left is Kind.INSTANT:
-            return Kind.DURATION if right is Kind.INSTANT else Kind.INSTANT
+        if left in _MOMENTS:
+            return Kind.DURATION if right in _MOMENTS else Kind.INSTANT
         return Kind.DURATION
     if op == "*":
         return Kind.NUMBER if left is Kind.NUMBER and right is Kind.NUMBER else Kind.DURATION
@@ -166,7 +179,7 @@ def _resolve(node: Node, expect: Expect, types: Types) -> Node:
             return DateAtTime(
                 node.start,
                 node.end,
-                _require_instant(date, "take the date from", types),
+                _require_moment(date, "take the date from", types),
                 _resolve(time, Expect.INSTANT, types),
             )
 
@@ -180,16 +193,16 @@ def _resolve(node: Node, expect: Expect, types: Types) -> Node:
             return Assign(node.start, node.end, name, _resolve(value, expect, types))
 
         case Negate(operand=operand):
-            if _infer(operand, types) is Kind.INSTANT:
-                raise DtcalcError("cannot negate an instant", node.start, node.end)
+            if (kind := _infer(operand, types)) in _MOMENTS:
+                raise DtcalcError(f"cannot negate {_article(kind)}", node.start, node.end)
             return Negate(node.start, node.end, _resolve(operand, Expect.DURATION, types))
 
         case Convert(operand=operand, zone_name=zone):
-            return Convert(node.start, node.end, _require_instant(operand, "convert", types), zone)
+            return Convert(node.start, node.end, _require_moment(operand, "convert", types), zone)
 
         case Attach(operand=operand, zone_name=zone):
             return Attach(
-                node.start, node.end, _require_instant(operand, "attach a zone to", types), zone
+                node.start, node.end, _require_moment(operand, "attach a zone to", types), zone
             )
 
         case Binary(op=op, left=left, right=right):
@@ -202,11 +215,16 @@ def _resolve(node: Node, expect: Expect, types: Types) -> Node:
             raise AssertionError(f"unhandled node {node!r}")
 
 
-def _require_instant(operand: Node, verb: str, types: Types) -> Node:
+def _require_moment(operand: Node, verb: str, types: Types) -> Node:
+    """Require a date or an instant — both denote a point on the calendar."""
     kind = _infer(operand, types)
-    if kind is not None and kind is not Kind.INSTANT:
-        raise DtcalcError(f"can only {verb} an instant, not a {kind}", operand.start, operand.end)
-    return _resolve(operand, Expect.INSTANT, types)
+    if kind is not None and kind not in _MOMENTS:
+        raise DtcalcError(
+            f"can only {verb} a date or an instant, not {_article(kind)}",
+            operand.start,
+            operand.end,
+        )
+    return _resolve(operand, Expect.MOMENT, types)
 
 
 def _resolve_binary(node: Node, op: str, left: Node, right: Node, types: Types) -> Node:
@@ -231,16 +249,16 @@ def _operand_expectations(
         return Expect.DURATION, Expect.DURATION
 
     if op == "+":
-        if left is Kind.INSTANT and right is Kind.INSTANT:
+        if left in _MOMENTS and right in _MOMENTS:
             raise DtcalcError(
-                "cannot add two instants; subtract them to get the time between",
+                "cannot add two points in time; subtract them to get the span between",
                 node.start,
                 node.end,
             )
-        if left is Kind.INSTANT:
-            return Expect.INSTANT, Expect.DURATION
-        if right is Kind.INSTANT:
-            return Expect.DURATION, Expect.INSTANT
+        if left in _MOMENTS:
+            return Expect.MOMENT, Expect.DURATION
+        if right in _MOMENTS:
+            return Expect.DURATION, Expect.MOMENT
         if left is None and right is None:
             # `12:15 + 12:15`: read the first as a time and the second as a
             # duration, which is the only combination that typechecks.
@@ -248,19 +266,19 @@ def _operand_expectations(
         return Expect.EITHER, Expect.DURATION
 
     if op == "-":
-        if left is Kind.INSTANT:
+        if left in _MOMENTS:
             # `<instant> - 12:15` is the original request's example: a
             # duration, not "the time between noon and a quarter past".
-            return Expect.INSTANT, Expect.DURATION
-        if right is Kind.INSTANT:
-            return Expect.INSTANT, Expect.INSTANT
+            return Expect.MOMENT, Expect.DURATION
+        if right in _MOMENTS:
+            return Expect.MOMENT, Expect.MOMENT
         if left is Kind.DURATION:
             return Expect.DURATION, Expect.DURATION
         return Expect.EITHER, Expect.DURATION
 
     # Comparisons: both sides must be the same kind, so a known side decides.
-    if left is Kind.INSTANT or right is Kind.INSTANT:
-        return Expect.INSTANT, Expect.INSTANT
+    if left in _MOMENTS or right in _MOMENTS:
+        return Expect.MOMENT, Expect.MOMENT
     if left is Kind.DURATION or right is Kind.DURATION:
         return Expect.DURATION, Expect.DURATION
     return Expect.EITHER, Expect.EITHER
@@ -308,7 +326,7 @@ def _decide(node: ColonLit, expect: Expect) -> Node:
     literal = node.literal
 
     if literal.forced_duration:
-        if expect is Expect.INSTANT:
+        if expect in (Expect.INSTANT, Expect.MOMENT):
             raise DtcalcError(
                 f"{node.text!r} is a duration, not a time of day", node.start, node.end
             )
@@ -324,7 +342,7 @@ def _decide(node: ColonLit, expect: Expect) -> Node:
             node.end,
         )
 
-    # Expect.INSTANT, and the tie-break for Expect.EITHER.
+    # Expect.INSTANT / Expect.MOMENT, and the tie-break for Expect.EITHER.
     return _as_time_of_day(node)
 
 

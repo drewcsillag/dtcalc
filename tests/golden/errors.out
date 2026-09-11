@@ -11,11 +11,11 @@ error: unexpected ')' after a complete expression
   now + 1h)
           ^
 dtcalc> now + now
-error: cannot add two instants; subtract them to get the time between
+error: cannot add two points in time; subtract them to get the span between
   now + now
   ^^^^^^^^^
 dtcalc> 5h in Tokyo
-error: can only convert an instant, not a duration
+error: can only convert a date or an instant, not a duration
   5h in Tokyo
   ^^
 dtcalc> -now

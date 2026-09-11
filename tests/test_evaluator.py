@@ -329,8 +329,8 @@ def test_an_undefined_variable_is_a_clear_error(env: Env) -> None:
 @pytest.mark.parametrize(
     ("source", "fragment"),
     [
-        ("now + now", "cannot add two instants"),
-        ("5h in Tokyo", "instant"),
+        ("now + now", "cannot add two points in time"),
+        ("5h in Tokyo", "a date or an instant"),
         ("-now", "negate"),
         ("now * 2", "cannot multiply"),
         ("now / 2", "cannot divide"),

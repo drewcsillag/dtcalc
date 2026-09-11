@@ -19,6 +19,7 @@ __all__ = ["SIGNATURES", "Expect", "Kind", "Signature"]
 class Kind(StrEnum):
     """The type of a value, as far as static reasoning can tell."""
 
+    DATE = "date"
     INSTANT = "instant"
     DURATION = "duration"
     NUMBER = "number"
@@ -29,6 +30,9 @@ class Expect(StrEnum):
     """What a position wants, which is how a colon literal gets decided."""
 
     INSTANT = "instant"
+    # A date or an instant: what `in`, `@ zone` and the rounding functions
+    # accept, since both denote a point on the calendar.
+    MOMENT = "moment"
     DURATION = "duration"
     NUMBER = "number"
     EITHER = "either"
@@ -61,8 +65,8 @@ SIGNATURES: Final[dict[str, Signature]] = {
     "round": Signature(2, 2, (Expect.EITHER, Expect.DURATION), None),
     "trunc": Signature(2, 2, (Expect.EITHER, Expect.DURATION), None),
     "ceil": Signature(2, 2, (Expect.EITHER, Expect.DURATION), None),
-    "diff": Signature(2, 2, (Expect.INSTANT, Expect.INSTANT), Kind.DURATION),
+    "diff": Signature(2, 2, (Expect.MOMENT, Expect.MOMENT), Kind.DURATION),
     "epoch": Signature(1, 1, (Expect.NUMBER,), Kind.INSTANT),
     "epochms": Signature(1, 1, (Expect.NUMBER,), Kind.INSTANT),
-    "unix": Signature(1, 1, (Expect.INSTANT,), Kind.NUMBER),
+    "unix": Signature(1, 1, (Expect.MOMENT,), Kind.NUMBER),
 }
