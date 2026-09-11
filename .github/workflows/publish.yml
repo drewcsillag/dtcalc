@@ -5,27 +5,25 @@ on:
     types: [published]
   workflow_dispatch:
 
+# Nothing is granted at the workflow level; each job asks for what it needs.
+permissions: {}
+
 jobs:
-  publish:
+  # Everything that runs project code, or code fetched from PyPI, happens
+  # here -- with no permissions and no environment, so there is nothing to
+  # steal. Splitting this from the publish job is the point: otherwise a
+  # compromised dev dependency, or anything merged to main, would execute in
+  # a job able to mint a PyPI token.
+  build:
     runs-on: ubuntu-latest
-
-    # The environment is the approval gate, and is also where PyPI's Trusted
-    # Publisher configuration is bound.
-    environment:
-      name: pypi
-      url: https://pypi.org/p/dtcalc-cli
-
     permissions:
-      # Required for Trusted Publishing: the job mints a short-lived OIDC
-      # token instead of using a stored API key.
-      id-token: write
+      contents: read
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        # Pinned exactly: setup-uv publishes moving major tags only through v7.
-        uses: astral-sh/setup-uv@v10.1.0
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
 
       - name: Set up Python
         run: uv python install
@@ -49,5 +47,34 @@ jobs:
       - name: Validate the built metadata
         run: uvx twine check --strict dist/*
 
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  # This job holds `id-token: write`, so it runs no project code and installs
+  # nothing from PyPI -- it only takes the artifact built above and hands it
+  # to the publish action.
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+
+    # The environment binds PyPI's Trusted Publisher configuration, and is
+    # where an approval gate can be added.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/dtcalc-cli
+
+    permissions:
+      # Mints a short-lived OIDC token instead of using a stored API key.
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: dist
+          path: dist/
+
       - name: Publish
-        uses: pypa/gh-action-pypi-publish@v1.14.2
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2

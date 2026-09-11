@@ -375,6 +375,15 @@ and the packaging metadata reads it from there, so `dtcalc --version` and the
 published version cannot drift; the release workflow additionally refuses to
 publish if the tag and the version disagree.
 
+The release workflow is split in two on purpose. The `build` job runs the
+tests, the build and anything else that executes project code or code fetched
+from PyPI, and it holds no permissions. Only the `publish` job holds
+`id-token: write`, and it runs no project code at all — it takes the built
+artifact and hands it to the publish action. Otherwise a compromised dev
+dependency would be executing in a job able to mint a PyPI token.
+
+Actions are pinned to commit SHAs rather than tags, since tags are mutable.
+
 Two debugging aids print the intermediate stages. The parser leaves colon
 literals undecided and a separate pass resolves them, so `--dump-ast` shows
 the tree twice:

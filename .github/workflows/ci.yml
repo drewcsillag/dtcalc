@@ -6,6 +6,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Least privilege, stated explicitly rather than inherited: CI reads the
+# repository and nothing else. A fork's pull request already runs with a
+# read-only token and no secrets, because the trigger is `pull_request` and
+# not `pull_request_target`.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -22,12 +29,12 @@ jobs:
         os: [ubuntu-latest, macos-latest]
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        # Pinned exactly: setup-uv publishes moving major tags only through
-        # v7, so `@v10` does not resolve.
-        uses: astral-sh/setup-uv@v10.1.0
+        # Pinned to a commit, not a tag: tags are mutable, so a compromised
+        # action repository could move one under us.
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
 
