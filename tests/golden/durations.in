@@ -1,0 +1,31 @@
+# The exact ladder cascades up to hours and stops there.
+90m
+3661s
+24h
+168h
+250ms
+1.5s
+1m1.5s
+# Calendar days and weeks are their own ladder.
+8d
+7d
+3w2h5m
+# So are months and years.
+15mo
+12mo
+# Business days are their own ladder again.
+3bd
+1bd2h
+3bd * 2
+# Mixed signs keep their own signs rather than pretending to reduce.
+1d - 90m
+# Arithmetic and division.
+3h + 45m
+2h / 15m
+24h / 4
+97m % 15m
+15h / 3h
+# Comparison uses a nominal 24-hour day, but only for days and weeks.
+1d < 25h
+1d == 24h
+1mo < 720h

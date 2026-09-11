@@ -1,0 +1,28 @@
+now +
+(now + 1h
+now + 1h)
+now + now
+5h in Tokyo
+-now
+now * 2
+1mo / 4
+1d % 5h
+1h / 0
+now in Atlantis
+now < 1h
+nope + 1h
+h = 3h
+min = 3h
+now = 3h
+a < b < c
+12:15s
+1:2:3:4
+32nd
+5hfoo
+now + 7h $
+nope(now)
+diff(now)
+trunc(now, 1mo)
+:nope
+:fmt sideways
+:tz Atlantis

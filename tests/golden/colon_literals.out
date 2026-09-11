@@ -1,0 +1,35 @@
+dtcalc> # A bare colon literal is a clock reading where that typechecks...
+dtcalc> 12:15
+2026-05-23T12:15:00-04:00  America/New_York
+dtcalc> 12:13 in Tokyo
+2026-05-24T01:13:00+09:00  Asia/Tokyo
+dtcalc> # ...and a duration where only that does.
+dtcalc> now - 12:15
+2026-05-23T00:00:13-04:00  America/New_York
+dtcalc> 12:15 * 2
+24h30m
+dtcalc> -12:15
+-12h15m
+dtcalc> # Both readings typecheck here, so the tie-break picks the clock reading.
+dtcalc> 12:15 + 3h
+2026-05-23T15:15:00-04:00  America/New_York
+dtcalc> # The two explicit forms force a duration, and name the leading unit.
+dtcalc> 12:15h
+12h15m
+dtcalc> 12:15m
+12m15s
+dtcalc> :12:15
+12m15s
+dtcalc> ::15
+15s
+dtcalc> 1:02:03
+2026-05-23T01:02:03-04:00  America/New_York
+dtcalc> 12:15:13.5 in Tokyo
+2026-05-24T01:15:13.5+09:00  Asia/Tokyo
+dtcalc> # An impossible clock reading is fine as a duration.
+dtcalc> now + 25:00
+2026-05-24T13:15:13-04:00  America/New_York
+dtcalc> 25:00 in Tokyo
+error: '25:00' is not a time of day
+  25:00 in Tokyo
+  ^^^^^

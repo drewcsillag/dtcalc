@@ -1,0 +1,12 @@
+# Every example from the original feature request.
+now + 7h
+2026-05-23T12:15:13 - 12:15
+2026-05-23T12:15:13 + 3w2h5m
+12:13 @ SanFrancisco
+foo = now
+bar = foo + 5h
+bar
+foo - 5h
+3h * 5
+# Days are calendar units, so this is 24h rather than 1d.
+8h * 3

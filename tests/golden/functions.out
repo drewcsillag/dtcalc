@@ -1,0 +1,30 @@
+dtcalc> trunc(now, 1h)
+2026-05-23T12:00:00-04:00  America/New_York
+dtcalc> round(now, 15m)
+2026-05-23T12:15:00-04:00  America/New_York
+dtcalc> ceil(now, 1d)
+2026-05-24T00:00:00-04:00  America/New_York
+dtcalc> trunc(now, 1w)
+2026-05-18T00:00:00-04:00  America/New_York
+dtcalc> trunc(now, 7h)
+2026-05-23T07:00:00-04:00  America/New_York
+dtcalc> round(97m, 15m)
+1h30m
+dtcalc> ceil(10d, 1w)
+2w
+dtcalc> round(14mo, 1y)
+1y
+dtcalc> min(now, now + 1h, now - 2h)
+2026-05-23T10:15:13-04:00  America/New_York
+dtcalc> max(3h, 45m, 2h)
+3h
+dtcalc> a = 2026-11-01T00:30
+2026-11-01T00:30:00-04:00  America/New_York
+dtcalc> b = 2026-11-02T00:30
+2026-11-02T00:30:00-05:00  America/New_York
+dtcalc> diff(a, b)
+1d
+dtcalc> b - a
+25h
+dtcalc> diff(2026-01-15T10:00, 2026-02-18T14:00)
+1mo3d4h

@@ -1,0 +1,35 @@
+:fmt
+now
+# timeonly drops the date, for arithmetic where the date is not the point.
+:fmt timeonly
+now
+now @ 4p
+# ...but marks a rollover, so it cannot look like a time this morning.
+now + 20h
+now - 20h
+now + 7d
+# The 12-hour clock applies to timeonly and human.
+:fmt 12h
+now
+now @ 12a
+now @ 12p
+:fmt human
+now
+:fmt human 24h
+now
+# It deliberately does not apply to iso, which would stop being ISO 8601.
+:fmt iso 12h
+now
+# unix has no clock at all.
+:fmt unix
+now
+1h30m
+:fmt iso 24h
+now
+# Durations, numbers and booleans are unaffected by either setting.
+:fmt timeonly 12h
+3w2h5m
+2h / 15m
+1h < 2h
+:fmt sideways
+:fmt 13h

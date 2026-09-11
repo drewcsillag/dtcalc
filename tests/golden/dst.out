@@ -1,0 +1,26 @@
+dtcalc> # Typed literals that name an impossible or doubled wall clock are refused.
+dtcalc> 2026-03-08T02:30
+error: 2026-03-08T02:30:00 does not exist in America/New_York: the clocks skip forward over it
+  2026-03-08T02:30
+  ^^^^^^^^^^^^^^^^
+dtcalc> 2026-11-01T01:30
+error: 2026-11-01T01:30:00 happens twice in America/New_York: the clocks fall back over it
+  2026-11-01T01:30
+  ^^^^^^^^^^^^^^^^
+dtcalc> # Reaching one by arithmetic is not the user's mistake, so it resolves with a note.
+dtcalc> 2026-03-07T02:30 + 1d
+2026-03-08T03:30:00-04:00  America/New_York
+note: 2026-03-08T02:30:00 does not exist in America/New_York (clocks skip forward), so it was moved forward
+dtcalc> 2026-10-31T01:30 + 1d
+2026-11-01T01:30:00-04:00  America/New_York
+note: 2026-11-01T01:30:00 happens twice in America/New_York (clocks fall back); the earlier one was used
+dtcalc> # A calendar day keeps the wall clock; exact hours keep the elapsed time.
+dtcalc> 2026-11-01T00:30 + 1d
+2026-11-02T00:30:00-05:00  America/New_York
+dtcalc> 2026-11-01T00:30 + 24h
+2026-11-01T23:30:00-05:00  America/New_York
+dtcalc> # Truncating to a calendar day lands on midnight even on a 25-hour day.
+dtcalc> trunc(2026-11-01T23:30, 1d)
+2026-11-01T00:00:00-04:00  America/New_York
+dtcalc> trunc(2026-11-01T23:30, 24h)
+2026-11-01T23:00:00-05:00  America/New_York
