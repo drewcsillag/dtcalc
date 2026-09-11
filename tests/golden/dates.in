@@ -1,0 +1,67 @@
+# A bare date stays a date: no time, no zone, nothing invented.
+2026-12-24
+today
+tomorrow
+yesterday
+upcoming friday
+previous 15th
+# The feature. A span of calendar days, not elapsed hours.
+2027-01-03 - 2026-12-24
+upcoming friday - today
+2026-12-24 - 2026-12-24
+# A calendar duration keeps it a date...
+2026-12-24 + 1d
+2026-12-24 + 2w
+2026-12-24 + 1mo
+2026-12-24 + 1y
+2026-12-24 + 3bd
+2026-12-24 + 0s
+2026-01-31 + 1mo
+# ...and anything naming a moment promotes it.
+2026-12-24 + 3h
+2026-12-24 + 1d3h
+2026-12-24 @ 12:00
+2026-12-24 @ 4p
+2026-12-24 in Tokyo
+2026-12-24 @ Tokyo
+# A date-time literal is unaffected.
+2026-12-24T09:00
+2026-12-24T09:00 - 2026-12-23T09:00
+# Mixed kinds promote the date and answer in elapsed time.
+now - today
+today < now
+2026-12-24 == 2026-12-24T00:00
+# The granularity decides the result type.
+trunc(now, 1h)
+trunc(now, 1d)
+trunc(now, 1w)
+trunc(now, 1mo)
+trunc(now, 1y)
+ceil(now, 1d)
+round(now, 1d)
+trunc(today, 1mo)
+ceil(2026-12-24, 1y)
+# Functions over dates.
+min(2026-12-24, 2027-01-03)
+max(2026-12-24, 2027-01-03)
+diff(2026-01-15, 2026-02-18)
+2026-02-18 - 2026-01-15
+unix(2026-12-24)
+# Display.
+:vars
+birthday = 2026-12-24
+deploy = 2026-07-04T16:00
+:vars
+:fmt human
+birthday
+:fmt timeonly
+birthday
+:fmt unix
+birthday
+:fmt iso
+# The working zone governs the arithmetic, not just the rendering.
+:tz
+:tz Tokyo
+today
+2026-12-24 in nyc
+:tz nyc

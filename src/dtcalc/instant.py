@@ -197,12 +197,15 @@ class Instant:
         happens to be 25 hours long still reads as ``1d``.  Contrast plain
         subtraction, which measures elapsed time and would say ``25h``.
         """
-        if other.moment < self.moment:
-            return -other.diff(self)
+        # Each direction is decomposed on its own. Negating the forward
+        # answer is *not* the inverse, because month steps clamp the day of
+        # month: Jan 2 +1mo +28d is Mar 1, while Mar 1 -1mo -28d is Jan 4.
+        ahead = other.moment >= self.moment
+        sign = 1 if ahead else -1
 
-        months = _greedy(lambda n: self + Duration(months=n), other)
+        months = sign * _greedy(lambda n: self + Duration(months=sign * n), other, ahead=ahead)
         after_months = self + Duration(months=months)
-        days = _greedy(lambda n: after_months + Duration(days=n), other)
+        days = sign * _greedy(lambda n: after_months + Duration(days=sign * n), other, ahead=ahead)
         after_days = after_months + Duration(days=days)
         remainder = other.elapsed_since(after_days)
         return Duration(months=months, days=days) + remainder
@@ -258,8 +261,11 @@ def _add_business_days(wall: datetime, bdays: int) -> datetime:
     return current
 
 
-def _greedy(build: Callable[[int], Instant], target: Instant) -> int:
-    """Largest ``n >= 0`` with ``build(n) <= target``, by doubling then bisecting.
+def _greedy(build: Callable[[int], Instant], target: Instant, *, ahead: bool) -> int:
+    """Largest ``n >= 0`` that does not overshoot ``target``.
+
+    ``ahead`` says which way we are walking: forwards, ``build(n)`` must stay
+    at or before the target; backwards, at or after it.
 
     Doubling rather than stepping so that a decade-wide difference costs a
     few dozen probes instead of a few thousand.
@@ -267,7 +273,8 @@ def _greedy(build: Callable[[int], Instant], target: Instant) -> int:
 
     def fits(n: int) -> bool:
         try:
-            return build(n).moment <= target.moment
+            moment = build(n).moment
+            return moment <= target.moment if ahead else moment >= target.moment
         except DtcalcError:
             # Ran off the end of the datetime range, so n is too large.
             return False

@@ -3,9 +3,9 @@ dtcalc> trunc(now, 1h)
 dtcalc> round(now, 15m)
 2026-05-23T12:15:00-04:00  America/New_York
 dtcalc> ceil(now, 1d)
-2026-05-24T00:00:00-04:00  America/New_York
+2026-05-24
 dtcalc> trunc(now, 1w)
-2026-05-18T00:00:00-04:00  America/New_York
+2026-05-18
 dtcalc> trunc(now, 7h)
 2026-05-23T07:00:00-04:00  America/New_York
 dtcalc> round(97m, 15m)

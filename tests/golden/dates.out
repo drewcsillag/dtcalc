@@ -1,0 +1,125 @@
+dtcalc> # A bare date stays a date: no time, no zone, nothing invented.
+dtcalc> 2026-12-24
+2026-12-24
+dtcalc> today
+2026-05-23
+dtcalc> tomorrow
+2026-05-24
+dtcalc> yesterday
+2026-05-22
+dtcalc> upcoming friday
+2026-05-29
+dtcalc> previous 15th
+2026-05-15
+dtcalc> # The feature. A span of calendar days, not elapsed hours.
+dtcalc> 2027-01-03 - 2026-12-24
+10d
+dtcalc> upcoming friday - today
+6d
+dtcalc> 2026-12-24 - 2026-12-24
+0s
+dtcalc> # A calendar duration keeps it a date...
+dtcalc> 2026-12-24 + 1d
+2026-12-25
+dtcalc> 2026-12-24 + 2w
+2027-01-07
+dtcalc> 2026-12-24 + 1mo
+2027-01-24
+dtcalc> 2026-12-24 + 1y
+2027-12-24
+dtcalc> 2026-12-24 + 3bd
+2026-12-29
+dtcalc> 2026-12-24 + 0s
+2026-12-24
+dtcalc> 2026-01-31 + 1mo
+2026-02-28
+dtcalc> # ...and anything naming a moment promotes it.
+dtcalc> 2026-12-24 + 3h
+2026-12-24T03:00:00-05:00  America/New_York
+dtcalc> 2026-12-24 + 1d3h
+2026-12-25T03:00:00-05:00  America/New_York
+dtcalc> 2026-12-24 @ 12:00
+2026-12-24T12:00:00-05:00  America/New_York
+dtcalc> 2026-12-24 @ 4p
+2026-12-24T16:00:00-05:00  America/New_York
+dtcalc> 2026-12-24 in Tokyo
+2026-12-24T00:00:00+09:00  Asia/Tokyo
+dtcalc> 2026-12-24 @ Tokyo
+2026-12-24T00:00:00+09:00  Asia/Tokyo
+dtcalc> # A date-time literal is unaffected.
+dtcalc> 2026-12-24T09:00
+2026-12-24T09:00:00-05:00  America/New_York
+dtcalc> 2026-12-24T09:00 - 2026-12-23T09:00
+24h
+dtcalc> # Mixed kinds promote the date and answer in elapsed time.
+dtcalc> now - today
+12h15m13s
+dtcalc> today < now
+true
+dtcalc> 2026-12-24 == 2026-12-24T00:00
+true
+dtcalc> # The granularity decides the result type.
+dtcalc> trunc(now, 1h)
+2026-05-23T12:00:00-04:00  America/New_York
+dtcalc> trunc(now, 1d)
+2026-05-23
+dtcalc> trunc(now, 1w)
+2026-05-18
+dtcalc> trunc(now, 1mo)
+2026-05-01
+dtcalc> trunc(now, 1y)
+2026-01-01
+dtcalc> ceil(now, 1d)
+2026-05-24
+dtcalc> round(now, 1d)
+2026-05-24
+dtcalc> trunc(today, 1mo)
+2026-05-01
+dtcalc> ceil(2026-12-24, 1y)
+2027-01-01
+dtcalc> # Functions over dates.
+dtcalc> min(2026-12-24, 2027-01-03)
+2026-12-24
+dtcalc> max(2026-12-24, 2027-01-03)
+2027-01-03
+dtcalc> diff(2026-01-15, 2026-02-18)
+1mo3d
+dtcalc> 2026-02-18 - 2026-01-15
+34d
+dtcalc> unix(2026-12-24)
+1798088400
+dtcalc> # Display.
+dtcalc> :vars
+(no variables set)
+dtcalc> birthday = 2026-12-24
+2026-12-24
+dtcalc> deploy = 2026-07-04T16:00
+2026-07-04T16:00:00-04:00  America/New_York
+dtcalc> :vars
+birthday  date     2026-12-24
+deploy    instant  2026-07-04T16:00:00-04:00  America/New_York
+dtcalc> :fmt human
+format is now human, 24h clock, no week grouping
+dtcalc> birthday
+Thu 2026-12-24
+dtcalc> :fmt timeonly
+format is now timeonly, 24h clock, no week grouping
+dtcalc> birthday
+2026-12-24
+dtcalc> :fmt unix
+format is now unix, 24h clock, no week grouping
+dtcalc> birthday
+1798088400
+dtcalc> :fmt iso
+format is now iso, 24h clock, no week grouping
+dtcalc> # The working zone governs the arithmetic, not just the rendering.
+dtcalc> :tz
+working zone is America/New_York
+dtcalc> :tz Tokyo
+working zone is now Asia/Tokyo
+dtcalc> today
+2026-05-24
+dtcalc> 2026-12-24 in nyc
+2026-12-24T00:00:00-05:00  America/New_York
+dtcalc> :tz nyc
+working zone is now America/New_York

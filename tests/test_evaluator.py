@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from dtcalc.date import Date
 from dtcalc.duration import Duration
 from dtcalc.env import Env
 from dtcalc.errors import DtcalcError
@@ -37,8 +38,15 @@ def ev(env: Env, source: str) -> object:
 
 def wall(env: Env, source: str) -> str:
     value = ev(env, source)
-    assert isinstance(value, Instant)
+    assert isinstance(value, Instant), f"{source} gave {value!r}"
     return value.wall_clock().isoformat()
+
+
+def date_of(env: Env, source: str) -> str:
+    """For expressions that now evaluate to a date rather than a midnight instant."""
+    value = ev(env, source)
+    assert isinstance(value, Date), f"{source} gave {value!r}"
+    return str(value)
 
 
 def dur(env: Env, source: str) -> str:
@@ -98,12 +106,8 @@ def test_eight_hours_times_three_is_twenty_four_hours_not_one_day(env: Env) -> N
         ("now + 1mo", "2026-06-23T12:15:13"),
         ("now + 1y", "2027-05-23T12:15:13"),
         ("now + 1bd", "2026-05-25T12:15:13"),
-        ("today", "2026-05-23T00:00:00"),
-        ("tomorrow", "2026-05-24T00:00:00"),
-        ("yesterday", "2026-05-22T00:00:00"),
         ("today 09:30", "2026-05-23T09:30:00"),
         ("tomorrow 09:00", "2026-05-24T09:00:00"),
-        ("2026-05-23", "2026-05-23T00:00:00"),
         ("2026-05-23T12:15", "2026-05-23T12:15:00"),
         ("2026-05-23 12:15:13", "2026-05-23T12:15:13"),
         ("2026-05-23T12:15:13Z", "2026-05-23T08:15:13"),
@@ -188,43 +192,47 @@ def test_the_display_zone_is_carried_through_arithmetic(env: Env) -> None:
     ("source", "expected"),
     [
         # 2026-05-23 is a Saturday.
-        ("upcoming monday", "2026-05-25T00:00:00"),
-        ("upcoming friday", "2026-05-29T00:00:00"),
-        ("upcoming saturday", "2026-05-30T00:00:00"),
-        ("previous friday", "2026-05-22T00:00:00"),
-        ("previous saturday", "2026-05-16T00:00:00"),
-        ("upcoming friday 09:00", "2026-05-29T09:00:00"),
+        ("upcoming monday", "2026-05-25"),
+        ("upcoming friday", "2026-05-29"),
+        ("upcoming saturday", "2026-05-30"),
+        ("previous friday", "2026-05-22"),
+        ("previous saturday", "2026-05-16"),
     ],
 )
 def test_weekday_references_are_strictly_after_or_before_today(
     env: Env, source: str, expected: str
 ) -> None:
-    assert wall(env, source) == expected
+    """These are dates now: no time was named, so none is invented."""
+    assert date_of(env, source) == expected
+
+
+def test_a_weekday_reference_with_a_time_is_an_instant(env: Env) -> None:
+    assert wall(env, "upcoming friday 09:00") == "2026-05-29T09:00:00"
 
 
 @pytest.mark.parametrize(
     ("source", "expected"),
     [
-        ("upcoming 1st", "2026-06-01T00:00:00"),
-        ("upcoming 15th", "2026-06-15T00:00:00"),
-        ("upcoming 24th", "2026-05-24T00:00:00"),
-        ("previous 1st", "2026-05-01T00:00:00"),
-        ("previous 23rd", "2026-04-23T00:00:00"),
-        ("upcoming 31st", "2026-05-31T00:00:00"),
+        ("upcoming 1st", "2026-06-01"),
+        ("upcoming 15th", "2026-06-15"),
+        ("upcoming 24th", "2026-05-24"),
+        ("previous 1st", "2026-05-01"),
+        ("previous 23rd", "2026-04-23"),
+        ("upcoming 31st", "2026-05-31"),
     ],
 )
 def test_day_of_month_references(env: Env, source: str, expected: str) -> None:
-    assert wall(env, source) == expected
+    assert date_of(env, source) == expected
 
 
 def test_a_day_of_month_reference_skips_months_that_lack_the_day(env: Env) -> None:
     ev(env, "x = 2026-01-31")
     # From 31 January, the next 31st is in March: February has no 31st.
-    assert wall(env, "upcoming 31st") == "2026-05-31T00:00:00"
+    assert date_of(env, "upcoming 31st") == "2026-05-31"
 
 
 def test_upcoming_on_the_same_day_of_month_goes_to_next_month(env: Env) -> None:
-    assert wall(env, "upcoming 23rd") == "2026-06-23T00:00:00"
+    assert date_of(env, "upcoming 23rd") == "2026-06-23"
 
 
 # --------------------------------------------------------------------------
@@ -329,8 +337,8 @@ def test_an_undefined_variable_is_a_clear_error(env: Env) -> None:
 @pytest.mark.parametrize(
     ("source", "fragment"),
     [
-        ("now + now", "cannot add two instants"),
-        ("5h in Tokyo", "instant"),
+        ("now + now", "cannot add two points in time"),
+        ("5h in Tokyo", "a date or an instant"),
         ("-now", "negate"),
         ("now * 2", "cannot multiply"),
         ("now / 2", "cannot divide"),

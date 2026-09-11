@@ -206,3 +206,76 @@ def test_a_colon_duration_subtracted_from_an_instant_moves_it_back(hour: int, mi
     assert isinstance(before, Instant)
     assert isinstance(after, Instant)
     assert before.elapsed_since(after) == D(h=hour, m=minute)
+
+
+# --------------------------------------------------------------------------
+# dates
+# --------------------------------------------------------------------------
+
+from datetime import date as StdDate  # noqa: E402
+
+from dtcalc.date import Date  # noqa: E402
+
+dates = st.dates(min_value=StdDate(1900, 1, 1), max_value=StdDate(2100, 12, 31)).map(Date.from_std)
+day_counts = st.integers(min_value=-20_000, max_value=20_000)
+month_counts = st.integers(min_value=-1200, max_value=1200)
+
+
+@given(dates, day_counts)
+def test_adding_days_then_measuring_returns_the_same_count(value: Date, days: int) -> None:
+    moved = value + D(d=days)
+    assert moved.days_since(value) == D(d=days)
+
+
+@given(dates, dates)
+def test_the_span_between_two_dates_reconstructs_the_later_one(a: Date, b: Date) -> None:
+    assert a + b.days_since(a) == b
+
+
+@given(dates, dates)
+def test_the_span_is_antisymmetric(a: Date, b: Date) -> None:
+    assert a.days_since(b) == -b.days_since(a)
+
+
+@given(dates, dates)
+def test_diff_reconstructs_the_endpoint_too(a: Date, b: Date) -> None:
+    """Even though it decomposes into months and days rather than days."""
+    assert a + a.diff(b) == b
+
+
+@given(dates)
+def test_a_date_round_trips_through_its_rendering(value: Date) -> None:
+    assert Date.from_iso(str(value)) == value
+
+
+@given(dates)
+def test_a_date_round_trips_through_the_language(value: Date) -> None:
+    assert evaluate(str(value)) == value
+
+
+@given(dates, month_counts)
+def test_adding_months_never_leaves_the_month_it_aimed_for(value: Date, months: int) -> None:
+    """Day-of-month clamping may move the day, never the month."""
+    moved = value + D(mo=months)
+    zero_based = value.year * 12 + value.month - 1 + months
+    assert (moved.year, moved.month) == (zero_based // 12, zero_based % 12 + 1)
+
+
+@given(dates, st.sampled_from([D(d=1), D(w=1), D(mo=1), D(y=1), D(bd=1), D()]))
+def test_a_calendar_duration_never_promotes_a_date(value: Date, duration: object) -> None:
+    assert isinstance(duration, Duration)
+    assert isinstance(value + duration, Date)
+
+
+@given(dates, st.sampled_from([D(h=1), D(m=1), D(s=1), D(ms=1)]))
+def test_an_exact_duration_always_promotes_a_date(value: Date, duration: object) -> None:
+    assert isinstance(duration, Duration)
+    assert Date.promotes(duration)
+
+
+@given(dates)
+def test_promotion_to_midnight_is_idempotent(value: Date) -> None:
+    """Promoting an already-promoted value changes nothing."""
+    once = value.at_midnight(NY)
+    assert once.wall_clock().date() == value.to_std()
+    assert Date.from_std(once.wall_clock().date()).at_midnight(NY).moment == once.moment

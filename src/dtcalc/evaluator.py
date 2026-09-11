@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import calendar
 from collections.abc import Callable
-from datetime import date as Date
+from datetime import date as StdDate
 from datetime import datetime, time, timedelta, timezone
-from typing import Final
+from typing import Final, assert_never
 from zoneinfo import ZoneInfo
 
 from dtcalc.ast import (
@@ -32,6 +32,7 @@ from dtcalc.ast import (
     VarRef,
     WeekdayRef,
 )
+from dtcalc.date import Date
 from dtcalc.duration import Duration
 from dtcalc.env import Env
 from dtcalc.errors import DtcalcError
@@ -83,19 +84,21 @@ class _Evaluator:
                 return self._at_time(self._today(), node)
 
             case DayKeyword(offset_days=offset):
-                return self._midnight(self._today() + timedelta(days=offset))
+                return Date.from_std(self._today() + timedelta(days=offset))
 
             case WeekdayRef(direction=direction, weekday=weekday):
-                return self._midnight(self._weekday_date(direction, weekday))
+                return Date.from_std(self._weekday_date(direction, weekday))
 
             case OrdinalRef(direction=direction, day=day):
-                return self._midnight(self._ordinal_date(direction, day, node))
+                return Date.from_std(self._ordinal_date(direction, day, node))
 
             case DateAtTime(date=date_node, time=time_node):
+                # The left side is a date or an instant; either way only its
+                # calendar date is wanted.  Naming a time always lands on an
+                # instant.
                 base = self.run(date_node)
-                assert isinstance(base, Instant)
                 assert isinstance(time_node, TimeOfDay)
-                return self._at_time(base.wall_clock().date(), time_node)
+                return self._at_time(_calendar_date_of(base, node), time_node)
 
             case DateTimeLit():
                 return self._datetime_literal(node)
@@ -121,26 +124,35 @@ class _Evaluator:
 
             case Convert(operand=operand, zone_name=zone_name):
                 target = self.run(operand)
+                zone = self._zone(zone_name, node)
+                if isinstance(target, Date):
+                    # A date has no zone to convert from, so naming one means
+                    # midnight there.  `@` means the same for a date.
+                    return target.at_midnight(zone)
                 if not isinstance(target, Instant):
                     raise DtcalcError(
-                        f"can only convert an instant to another zone, not {_describe(target)}",
+                        f"can only convert a date or an instant to another zone, "
+                        f"not {_describe(target)}",
                         node.start,
                         node.end,
                     )
-                return target.convert_to(self._zone(zone_name, node))
+                return target.convert_to(zone)
 
             case Attach(operand=operand, zone_name=zone_name):
                 subject = self.run(operand)
+                zone = self._zone(zone_name, node)
+                if isinstance(subject, Date):
+                    return subject.at_midnight(zone)
                 if not isinstance(subject, Instant):
                     raise DtcalcError(
-                        f"can only attach a zone to an instant, not {_describe(subject)}",
+                        f"can only attach a zone to a date or an instant, not {_describe(subject)}",
                         node.start,
                         node.end,
                     )
-                return subject.attach(self._zone(zone_name, node))
+                return subject.attach(zone)
 
             case Binary(op=op, left=left, right=right):
-                return _binary(op, self.run(left), self.run(right), node)
+                return _binary(op, self.run(left), self.run(right), node, self._env.zone)
 
             case Call(name=name, args=args):
                 return call_builtin(name, tuple(self.run(arg) for arg in args), node, self._env)
@@ -152,20 +164,20 @@ class _Evaluator:
     # dates and times
     # ------------------------------------------------------------------
 
-    def _today(self) -> Date:
+    def _today(self) -> StdDate:
         return self._now.astimezone(self._env.zone).date()
 
-    def _midnight(self, day: Date) -> Instant:
+    def _midnight(self, day: StdDate) -> Instant:
         return Instant.from_wall_clock(self._env.zone, datetime.combine(day, time()), strict=False)
 
-    def _at_time(self, day: Date, reading: TimeOfDay) -> Instant:
+    def _at_time(self, day: StdDate, reading: TimeOfDay) -> Instant:
         wall = datetime.combine(
             day,
             time(reading.hour, reading.minute, reading.second, reading.microsecond),
         )
         return Instant.from_wall_clock(self._env.zone, wall, strict=False)
 
-    def _weekday_date(self, direction: str, weekday: int) -> Date:
+    def _weekday_date(self, direction: str, weekday: int) -> StdDate:
         """The nearest such weekday, strictly after or before today.
 
         Strictly: asking for ``upcoming friday`` on a Friday gives next week's,
@@ -178,7 +190,7 @@ class _Evaluator:
         delta = (today.weekday() - weekday) % _DAYS_PER_WEEK or _DAYS_PER_WEEK
         return today - timedelta(days=delta)
 
-    def _ordinal_date(self, direction: str, day: int, node: Node) -> Date:
+    def _ordinal_date(self, direction: str, day: int, node: Node) -> StdDate:
         """The nearest such day of the month, strictly after or before today.
 
         Months that do not have the day are skipped, so the next 31st after
@@ -189,7 +201,7 @@ class _Evaluator:
         year, month = today.year, today.month
         for _ in range(_MAX_MONTHS_SEARCHED):
             if day <= calendar.monthrange(year, month)[1]:
-                candidate = Date(year, month, day)
+                candidate = StdDate(year, month, day)
                 if (candidate > today) if step > 0 else (candidate < today):
                     return candidate
             month += step
@@ -203,8 +215,11 @@ class _Evaluator:
             f"no {direction} day {day} of the month is in range", node.start, node.end
         )
 
-    def _datetime_literal(self, node: DateTimeLit) -> Instant:
+    def _datetime_literal(self, node: DateTimeLit) -> Date | Instant:
         literal = node.literal
+        if not literal.has_time and literal.offset_minutes is None:
+            # A bare date stays a date; the lexer already distinguished them.
+            return Date(literal.year, literal.month, literal.day)
         naive = datetime(
             literal.year,
             literal.month,
@@ -239,8 +254,28 @@ class _Evaluator:
 _COMPARISONS: Final = {"<", "<=", ">", ">=", "==", "!="}
 
 
+def _calendar_date_of(value: Value, node: Node) -> StdDate:
+    """The calendar date of a date or an instant, for `@ <time>`."""
+    if isinstance(value, Date):
+        return value.to_std()
+    if isinstance(value, Instant):
+        return value.wall_clock().date()
+    raise DtcalcError(
+        f"can only set the time on a date or an instant, not {_describe(value)}",
+        node.start,
+        node.end,
+    )
+
+
 def _describe(value: Value) -> str:
+    """A value's kind, for error messages.
+
+    Exhaustive over the ``Value`` union by ``assert_never``, so a new value
+    type cannot reach a user as "a <unknown>".
+    """
     match value:
+        case Date():
+            return "a date"
         case Instant():
             return "an instant"
         case Duration():
@@ -249,15 +284,24 @@ def _describe(value: Value) -> str:
             return "a number"
         case Boolean():
             return "a boolean"
+        case _ as unhandled:
+            assert_never(unhandled)
 
 
-def _binary(op: str, left: Value, right: Value, node: Node) -> Value:
+def _binary(op: str, left: Value, right: Value, node: Node, zone: ZoneInfo) -> Value:
+    """Dispatch a binary operator.
+
+    ``zone`` is the working zone, needed wherever a date has to become a
+    moment — promotion and cross-kind comparison.  It is threaded through
+    rather than read from a global so these helpers stay pure functions of
+    their inputs.
+    """
     if op in _COMPARISONS:
-        return Boolean(_compare(op, left, right, node))
+        return Boolean(_compare(op, left, right, node, zone))
     if op == "+":
-        return _add(left, right, node)
+        return _add(left, right, node, zone)
     if op == "-":
-        return _subtract(left, right, node)
+        return _subtract(left, right, node, zone)
     if op == "*":
         return _multiply(left, right, node)
     if op == "/":
@@ -265,8 +309,12 @@ def _binary(op: str, left: Value, right: Value, node: Node) -> Value:
     return _modulo(left, right, node)
 
 
-def _add(left: Value, right: Value, node: Node) -> Value:
+def _add(left: Value, right: Value, node: Node, zone: ZoneInfo) -> Value:
     match left, right:
+        case Date(), Duration():
+            return _wrap(lambda: _add_to_date(left, right, zone), node)
+        case Duration(), Date():
+            return _wrap(lambda: _add_to_date(right, left, zone), node)
         case Instant(), Duration():
             return left + right
         case Duration(), Instant():
@@ -275,23 +323,34 @@ def _add(left: Value, right: Value, node: Node) -> Value:
             return left + right
         case Number(), Number():
             return Number(left.value + right.value)
-        case Instant(), Instant():
+        case ((Date() | Instant()), (Date() | Instant())):
             raise DtcalcError(
-                "cannot add two instants; subtract them to get the time between",
+                "cannot add two points in time; subtract them to get the span between",
                 node.start,
                 node.end,
             )
         case _:
             raise DtcalcError(
                 f"cannot add {_describe(right)} to {_describe(left)}; "
-                f"adding to an instant needs a duration",
+                f"adding to a point in time needs a duration",
                 node.start,
                 node.end,
             )
 
 
-def _subtract(left: Value, right: Value, node: Node) -> Value:
+def _subtract(left: Value, right: Value, node: Node, zone: ZoneInfo) -> Value:
     match left, right:
+        case Date(), Duration():
+            return _wrap(lambda: _add_to_date(left, -right, zone), node)
+        case Date(), Date():
+            # The feature: a span of calendar days, not elapsed hours.
+            return left.days_since(right)
+        case Date(), Instant():
+            # Mixed, so the answer is an elapsed time and the date has to
+            # become a moment first.
+            return left.at_midnight(zone).elapsed_since(right)
+        case Instant(), Date():
+            return left.elapsed_since(right.at_midnight(zone))
         case Instant(), Duration():
             return left - right
         case Instant(), Instant():
@@ -306,6 +365,18 @@ def _subtract(left: Value, right: Value, node: Node) -> Value:
                 node.start,
                 node.end,
             )
+
+
+def _add_to_date(date: Date, duration: Duration, zone: ZoneInfo) -> Date | Instant:
+    """Apply a duration to a date, promoting only if it names a moment.
+
+    The calendar parts move the date; an exact part means an instant was
+    asked for, so the date becomes midnight in the working zone first.
+    """
+    moved = date + Duration(months=duration.months, days=duration.days, bdays=duration.bdays)
+    if not Date.promotes(duration):
+        return moved
+    return moved.at_midnight(zone) + Duration(millis=duration.millis)
 
 
 def _multiply(left: Value, right: Value, node: Node) -> Value:
@@ -350,8 +421,8 @@ def _modulo(left: Value, right: Value, node: Node) -> Value:
     )
 
 
-def _compare(op: str, left: Value, right: Value, node: Node) -> bool:
-    order = _ordering(left, right, node)
+def _compare(op: str, left: Value, right: Value, node: Node, zone: ZoneInfo) -> bool:
+    order = _ordering(left, right, node, zone)
     match op:
         case "<":
             return order < 0
@@ -367,8 +438,15 @@ def _compare(op: str, left: Value, right: Value, node: Node) -> bool:
             return order != 0
 
 
-def _ordering(left: Value, right: Value, node: Node) -> int:
+def _ordering(left: Value, right: Value, node: Node, zone: ZoneInfo) -> int:
     match left, right:
+        case Date(), Date():
+            return _sign((left > right) - (left < right))
+        case Date(), Instant():
+            # Both are points in time, so promote and compare the moments.
+            return _ordering(left.at_midnight(zone), right, node, zone)
+        case Instant(), Date():
+            return _ordering(left, right.at_midnight(zone), node, zone)
         case Instant(), Instant():
             return _sign((left.moment > right.moment) - (left.moment < right.moment))
         case Duration(), Duration():
