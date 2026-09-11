@@ -7,3 +7,9 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+# Anchored: an unanchored `coverage.json` would also match the committed
+# badge at .github/badges/coverage.json.
+/coverage.json
+.coverage
+.coverage.*
+!.github/badges/coverage.json

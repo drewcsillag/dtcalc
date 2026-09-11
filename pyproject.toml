@@ -39,6 +39,8 @@ dev = [
     "pexpect>=4.9",
     "ruff>=0.6",
     "mypy>=1.11",
+    "coverage>=7.16.0",
+    "pytest-cov>=7.1.0",
 ]
 
 # Single source of truth for the version: the module itself, so the packaging
@@ -59,7 +61,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.13"
 strict = true
-files = ["src", "tests"]
+files = ["src", "tests", "scripts"]
 
 [[tool.mypy.overrides]]
 module = "pexpect.*"
@@ -68,3 +70,22 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.coverage.run]
+source_pkgs = ["dtcalc"]
+branch = true
+# The pexpect tests drive a real `python -m dtcalc` child process. Without
+# parallel mode plus COVERAGE_PROCESS_START, that child's lines are invisible
+# and repl.py looks untested when it is not.
+parallel = true
+concurrency = ["multiprocessing"]
+
+[tool.coverage.report]
+precision = 1
+show_missing = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise AssertionError",
+    "@overload",
+    "\\.\\.\\.",
+]
