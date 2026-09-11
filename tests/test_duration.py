@@ -199,11 +199,11 @@ def test_modulo_by_zero_is_an_error() -> None:
         (D(h=24), "24h"),  # never 1d
         (D(h=15), "15h"),
         (D(h=168), "168h"),
-        (D(d=8), "1w1d"),
-        (D(d=7), "1w"),
+        (D(d=8), "8d"),
+        (D(d=7), "7d"),
         (D(mo=15), "1y3mo"),
         (D(mo=12), "1y"),
-        (D(w=3, h=2, m=5), "3w2h5m"),
+        (D(w=3, h=2, m=5), "21d2h5m"),
         (D(bd=3), "3bd"),
         (D(bd=1, h=2), "1bd2h"),
         (D(s=1.5), "1.5s"),
@@ -211,9 +211,9 @@ def test_modulo_by_zero_is_an_error() -> None:
         (D(ms=1), "1ms"),
         (D(m=1, s=1.5), "1m1.5s"),
         (D(h=-1, m=-30), "-1h30m"),
-        (D(d=-8), "-1w1d"),
+        (D(d=-8), "-8d"),
         (D(mo=1, d=3, h=4), "1mo3d4h"),
-        (D(y=1, mo=2, w=1, d=1, h=1, m=1, s=1), "1y2mo1w1d1h1m1s"),
+        (D(y=1, mo=2, w=1, d=1, h=1, m=1, s=1), "1y2mo8d1h1m1s"),
     ],
 )
 def test_formatting(duration: Duration, expected: str) -> None:
@@ -338,3 +338,77 @@ def test_calendar_division_messages_are_not_written_in_broken_english() -> None:
         _ = D(mo=1) / 4.0
     with pytest.raises(DtcalcError, match="5 months does not divide evenly"):
         _ = D(mo=5) / 4.0
+
+
+# --------------------------------------------------------------------------
+# 1.1  week grouping, which is now off by default
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("duration", "expected"),
+    [
+        (D(d=10), "10d"),
+        (D(d=8), "8d"),
+        (D(d=7), "7d"),
+        (D(d=1), "1d"),
+        (D(w=3), "21d"),
+        (D(w=2), "14d"),
+        (D(w=3, h=2, m=5), "21d2h5m"),
+        (D(d=-8), "-8d"),
+        (D(y=1, mo=2, w=1, d=1, h=1, m=1, s=1), "1y2mo8d1h1m1s"),
+        # The months ladder is untouched by the toggle.
+        (D(mo=15), "1y3mo"),
+        (D(mo=12), "1y"),
+        # Nothing else moves.
+        (D(h=24), "24h"),
+        (D(m=90), "1h30m"),
+        (D(bd=3), "3bd"),
+        (D(), "0s"),
+    ],
+)
+def test_the_default_rendering_no_longer_groups_weeks(duration: Duration, expected: str) -> None:
+    assert str(duration) == expected
+
+
+@pytest.mark.parametrize(
+    ("duration", "expected"),
+    [
+        (D(d=10), "1w3d"),
+        (D(d=8), "1w1d"),
+        (D(d=7), "1w"),
+        (D(d=1), "1d"),
+        (D(w=3), "3w"),
+        (D(w=3, h=2, m=5), "3w2h5m"),
+        (D(d=-8), "-1w1d"),
+        (D(y=1, mo=2, w=1, d=1, h=1, m=1, s=1), "1y2mo1w1d1h1m1s"),
+        (D(mo=15), "1y3mo"),
+        (D(h=24), "24h"),
+        (D(bd=3), "3bd"),
+        (D(), "0s"),
+    ],
+)
+def test_week_grouping_can_be_asked_for(duration: Duration, expected: str) -> None:
+    assert duration.render(group_weeks=True) == expected
+
+
+def test_the_two_renderings_agree_below_a_week() -> None:
+    for days in range(7):
+        duration = D(d=days, h=1)
+        assert str(duration) == duration.render(group_weeks=True)
+
+
+def test_grouping_is_a_rendering_choice_not_a_value_change() -> None:
+    """Both spellings denote the same duration."""
+    assert D(d=10) == D(w=1, d=3)
+    assert str(D(d=10)) != D(d=10).render(group_weeks=True)
+
+
+def test_mixed_signs_still_print_each_group_with_its_own_sign() -> None:
+    assert str(D(d=10) - D(m=90)) == "10d -1h30m"
+    assert (D(d=10) - D(m=90)).render(group_weeks=True) == "1w3d -1h30m"
+
+
+def test_the_feature_this_unblocks() -> None:
+    """Ten calendar days is the shape `date - date` will return."""
+    assert str(D(d=10)) == "10d"

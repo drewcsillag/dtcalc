@@ -124,7 +124,7 @@ def test_tz_rejects_an_unknown_zone(env: Env) -> None:
 
 
 def test_fmt_reports_the_current_format(env: Env) -> None:
-    assert run(env, ":fmt") == (Outcome.OK, ["format is iso, 24h clock"])
+    assert run(env, ":fmt") == (Outcome.OK, ["format is iso, 24h clock, no week grouping"])
 
 
 def test_fmt_switches_the_format(env: Env) -> None:
@@ -191,7 +191,7 @@ def test_fmt_timeonly_marks_a_rollover(env: Env) -> None:
 def test_fmt_accepts_a_clock_modifier_alongside_the_format(env: Env) -> None:
     outcome, lines = run(env, ":fmt timeonly 12h")
     assert outcome is Outcome.OK
-    assert lines == ["format is now timeonly, 12h clock"]
+    assert lines == ["format is now timeonly, 12h clock, no week grouping"]
     _, result = run(env, "now")
     assert result[0] == "12:15:13 PM EDT"
 
@@ -200,7 +200,7 @@ def test_fmt_accepts_a_bare_clock_modifier(env: Env) -> None:
     run(env, ":fmt timeonly")
     outcome, lines = run(env, ":fmt 12h")
     assert outcome is Outcome.OK
-    assert lines == ["format is now timeonly, 12h clock"]
+    assert lines == ["format is now timeonly, 12h clock, no week grouping"]
     _, result = run(env, "now")
     assert result[0] == "12:15:13 PM EDT"
 
@@ -213,7 +213,13 @@ def test_a_bare_clock_modifier_leaves_the_format_alone(env: Env) -> None:
 
 
 def test_fmt_reports_both_settings(env: Env) -> None:
-    assert run(env, ":fmt") == (Outcome.OK, ["format is iso, 24h clock"])
+    """Superseded by test_fmt_reports_all_three_settings; kept as a guard that
+    the no-argument form reports rather than changes anything."""
+    before = (env.fmt, env.clock_style, env.group_weeks)
+    outcome, lines = run(env, ":fmt")
+    assert outcome is Outcome.OK
+    assert lines[0].startswith("format is ")
+    assert (env.fmt, env.clock_style, env.group_weeks) == before
 
 
 def test_fmt_rejects_an_unknown_clock(env: Env) -> None:
@@ -237,3 +243,62 @@ def test_vars_uses_the_current_format(env: Env) -> None:
     run(env, ":fmt timeonly")
     _, lines = run(env, ":vars")
     assert lines == ["a  12:15:13 EDT"]
+
+
+# --------------------------------------------------------------------------
+# 1.2  the :fmt weeks/noweeks toggle
+# --------------------------------------------------------------------------
+
+
+def test_fmt_reports_all_three_settings(env: Env) -> None:
+    assert run(env, ":fmt") == (Outcome.OK, ["format is iso, 24h clock, no week grouping"])
+
+
+def test_weeks_are_not_grouped_by_default(env: Env) -> None:
+    assert run(env, "10d") == (Outcome.OK, ["10d"])
+
+
+def test_fmt_weeks_turns_grouping_on(env: Env) -> None:
+    outcome, lines = run(env, ":fmt weeks")
+    assert outcome is Outcome.OK
+    assert lines == ["format is now iso, 24h clock, week grouping"]
+    assert run(env, "10d") == (Outcome.OK, ["1w3d"])
+
+
+def test_fmt_noweeks_turns_grouping_back_off(env: Env) -> None:
+    run(env, ":fmt weeks")
+    run(env, ":fmt noweeks")
+    assert run(env, "10d") == (Outcome.OK, ["10d"])
+
+
+def test_the_three_settings_combine_in_one_command(env: Env) -> None:
+    outcome, lines = run(env, ":fmt human 12h weeks")
+    assert outcome is Outcome.OK
+    assert lines == ["format is now human, 12h clock, week grouping"]
+    assert run(env, "10d") == (Outcome.OK, ["1w3d"])
+    _, result = run(env, "now")
+    assert result[0] == "Sat 2026-05-23 12:15:13 PM EDT"
+
+
+def test_the_toggle_does_not_reach_the_months_ladder(env: Env) -> None:
+    """Years group more naturally than weeks, so `mo` is unaffected."""
+    assert run(env, "15mo") == (Outcome.OK, ["1y3mo"])
+    run(env, ":fmt weeks")
+    assert run(env, "15mo") == (Outcome.OK, ["1y3mo"])
+
+
+def test_the_toggle_does_not_reach_the_exact_ladder(env: Env) -> None:
+    run(env, ":fmt weeks")
+    assert run(env, "24h") == (Outcome.OK, ["24h"])
+    assert run(env, "90m") == (Outcome.OK, ["1h30m"])
+
+
+def test_an_unknown_word_names_all_three_categories(env: Env) -> None:
+    outcome, lines = run(env, ":fmt sideways")
+    assert outcome is Outcome.ERROR
+    for fragment in ("formats are", "clocks are", "grouping"):
+        assert fragment in lines[0]
+
+
+def test_help_mentions_the_week_toggle(env: Env) -> None:
+    assert any("weeks" in line for line in help_text())

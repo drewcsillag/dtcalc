@@ -18,7 +18,7 @@ from dtcalc.builtins import SIGNATURES
 from dtcalc.env import Env
 from dtcalc.errors import DtcalcError
 from dtcalc.evaluator import evaluate_line
-from dtcalc.format import CLOCKS, FORMATS, Style, format_value, render
+from dtcalc.format import CLOCKS, FORMATS, GROUPINGS, Style, format_value, render
 from dtcalc.lexer import is_meta_command, tokenize
 from dtcalc.zones import resolve_zone, search_zones
 
@@ -146,31 +146,40 @@ def _set_format(argument: str, env: Env, style: Style) -> Result:
     words = argument.split()
     fmt: str | None = None
     clock: str | None = None
+    grouping: str | None = None
     for word in words:
         if word in CLOCKS:
             clock = word
         elif word in FORMATS:
             fmt = word
+        elif word in GROUPINGS:
+            grouping = word
         else:
             return Result(
                 Outcome.ERROR,
                 (
                     style.error(
                         f"error: unknown setting {word!r}; formats are "
-                        f"{', '.join(FORMATS)}; clocks are {', '.join(CLOCKS)}"
+                        f"{', '.join(FORMATS)}; clocks are {', '.join(CLOCKS)}; "
+                        f"week grouping is {' or '.join(GROUPINGS)}"
                     ),
                 ),
             )
 
+    # Nothing is applied unless every word parsed, so a typo cannot half-apply.
     if fmt is not None:
         env.fmt = fmt
     if clock is not None:
         env.clock_style = clock
-    return Result(Outcome.OK, (f"format is now {env.fmt}, {env.clock_style} clock",))
+    if grouping is not None:
+        env.group_weeks = grouping == "weeks"
+    return Result(Outcome.OK, (_describe_format(env, changed=True),))
 
 
-def _describe_format(env: Env) -> str:
-    return f"format is {env.fmt}, {env.clock_style} clock"
+def _describe_format(env: Env, *, changed: bool = False) -> str:
+    grouping = "week grouping" if env.group_weeks else "no week grouping"
+    verb = "is now" if changed else "is"
+    return f"format {verb} {env.fmt}, {env.clock_style} clock, {grouping}"
 
 
 def help_text() -> list[str]:
@@ -192,7 +201,9 @@ def help_text() -> list[str]:
         "functions   " + ", ".join(sorted(SIGNATURES)),
         "ladders     ms/s/m/h are exact; d/w and mo/y are calendar; bd is business",
         "            days.  They never convert, so 8h * 3 is 24h and never 1d.",
+        "            Days do not group into weeks unless you ask (:fmt weeks).",
         "commands    :help  :vars  :zones <text>  :tz <zone>  :q",
-        "            :fmt iso|human|unix|timeonly and/or 24h|12h",
-        "            (the clock applies to human and timeonly, not to iso)",
+        "            :fmt iso|human|unix|timeonly, 24h|12h, weeks|noweeks",
+        "            (the clock applies to human and timeonly, not to iso;",
+        "             weeks groups days, so 10d shows as 1w3d)",
     ]

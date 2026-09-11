@@ -1,10 +1,10 @@
 dtcalc> :fmt
-format is iso, 24h clock
+format is iso, 24h clock, no week grouping
 dtcalc> now
 2026-05-23T12:15:13-04:00  America/New_York
 dtcalc> # timeonly drops the date, for arithmetic where the date is not the point.
 dtcalc> :fmt timeonly
-format is now timeonly, 24h clock
+format is now timeonly, 24h clock, no week grouping
 dtcalc> now
 12:15:13 EDT
 dtcalc> now @ 4p
@@ -18,7 +18,7 @@ dtcalc> now + 7d
 12:15:13 EDT (+7d)
 dtcalc> # The 12-hour clock applies to timeonly and human.
 dtcalc> :fmt 12h
-format is now timeonly, 12h clock
+format is now timeonly, 12h clock, no week grouping
 dtcalc> now
 12:15:13 PM EDT
 dtcalc> now @ 12a
@@ -26,39 +26,64 @@ dtcalc> now @ 12a
 dtcalc> now @ 12p
 12:00:00 PM EDT
 dtcalc> :fmt human
-format is now human, 12h clock
+format is now human, 12h clock, no week grouping
 dtcalc> now
 Sat 2026-05-23 12:15:13 PM EDT
 dtcalc> :fmt human 24h
-format is now human, 24h clock
+format is now human, 24h clock, no week grouping
 dtcalc> now
 Sat 2026-05-23 12:15:13 EDT
 dtcalc> # It deliberately does not apply to iso, which would stop being ISO 8601.
 dtcalc> :fmt iso 12h
-format is now iso, 12h clock
+format is now iso, 12h clock, no week grouping
 dtcalc> now
 2026-05-23T12:15:13-04:00  America/New_York
 dtcalc> # unix has no clock at all.
 dtcalc> :fmt unix
-format is now unix, 12h clock
+format is now unix, 12h clock, no week grouping
 dtcalc> now
 1779552913
 dtcalc> 1h30m
 5400
 dtcalc> :fmt iso 24h
-format is now iso, 24h clock
+format is now iso, 24h clock, no week grouping
 dtcalc> now
 2026-05-23T12:15:13-04:00  America/New_York
-dtcalc> # Durations, numbers and booleans are unaffected by either setting.
-dtcalc> :fmt timeonly 12h
-format is now timeonly, 12h clock
+dtcalc> # Week grouping: off by default, and it reaches the day ladder only.
+dtcalc> :fmt iso 24h
+format is now iso, 24h clock, no week grouping
+dtcalc> 10d
+10d
+dtcalc> 8d
+8d
+dtcalc> 3w2h5m
+21d2h5m
+dtcalc> :fmt weeks
+format is now iso, 24h clock, week grouping
+dtcalc> 10d
+1w3d
+dtcalc> 8d
+1w1d
 dtcalc> 3w2h5m
 3w2h5m
+dtcalc> 15mo
+1y3mo
+dtcalc> 24h
+24h
+dtcalc> :fmt noweeks
+format is now iso, 24h clock, no week grouping
+dtcalc> 10d
+10d
+dtcalc> # Durations, numbers and booleans are unaffected by either setting.
+dtcalc> :fmt timeonly 12h
+format is now timeonly, 12h clock, no week grouping
+dtcalc> 3w2h5m
+21d2h5m
 dtcalc> 2h / 15m
 8
 dtcalc> 1h < 2h
 true
 dtcalc> :fmt sideways
-error: unknown setting 'sideways'; formats are iso, human, unix, timeonly; clocks are 24h, 12h
+error: unknown setting 'sideways'; formats are iso, human, unix, timeonly; clocks are 24h, 12h; week grouping is noweeks or weeks
 dtcalc> :fmt 13h
-error: unknown setting '13h'; formats are iso, human, unix, timeonly; clocks are 24h, 12h
+error: unknown setting '13h'; formats are iso, human, unix, timeonly; clocks are 24h, 12h; week grouping is noweeks or weeks

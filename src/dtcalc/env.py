@@ -21,6 +21,7 @@ class Env:
     zone: ZoneInfo
     fmt: str = "iso"
     clock_style: str = "24h"
+    group_weeks: bool = False
     variables: dict[str, Value] = field(default_factory=dict)
 
     def types(self) -> dict[str, Kind]:
@@ -36,5 +37,6 @@ class Env:
         return Display(
             fmt=self.fmt,
             clock=self.clock_style,
+            group_weeks=self.group_weeks,
             today=self.clock.now().astimezone(self.zone).date(),
         )
