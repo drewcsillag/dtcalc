@@ -1,0 +1,31 @@
+dtcalc> # @ reads a wall clock in another zone; in shows an instant in another zone.
+dtcalc> 12:13 @ SanFrancisco
+2026-05-23T15:13:00-04:00  America/New_York
+dtcalc> now in Tokyo
+2026-05-24T01:15:13+09:00  Asia/Tokyo
+dtcalc> now in America/Los_Angeles
+2026-05-23T09:15:13-07:00  America/Los_Angeles
+dtcalc> now in utc
+2026-05-23T16:15:13+00:00  UTC
+dtcalc> 12:13 @ sf in Tokyo
+2026-05-24T04:13:00+09:00  Asia/Tokyo
+dtcalc> # Aliases, abbreviations and a unique substring all resolve.
+dtcalc> now in nyc
+2026-05-23T12:15:13-04:00  America/New_York
+dtcalc> now in PST
+2026-05-23T09:15:13-07:00  America/Los_Angeles
+dtcalc> now in Reykjavik
+2026-05-23T16:15:13+00:00  Atlantic/Reykjavik
+dtcalc> # Precedence: @ binds tightest, in binds loosest.
+dtcalc> 12:13 @ sf + 2h in Tokyo
+2026-05-24T06:13:00+09:00  Asia/Tokyo
+dtcalc> (now + 1d) in Tokyo
+2026-05-25T01:15:13+09:00  Asia/Tokyo
+dtcalc> :zones tokyo
+Asia/Tokyo
+dtcalc> :tz Tokyo
+display zone is now Asia/Tokyo
+dtcalc> now
+2026-05-24T01:15:13+09:00  Asia/Tokyo
+dtcalc> :tz nyc
+display zone is now America/New_York

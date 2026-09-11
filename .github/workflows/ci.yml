@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # Both readline backends get covered: Linux has GNU readline, macOS ships
+    # libedit. The REPL's prompt handling differs between them, and a bug
+    # there is what broke Ctrl-A once already, so it is worth the second job.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        # Pinned exactly: setup-uv publishes moving major tags only through
+        # v7, so `@v10` does not resolve.
+        uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Lint
+        run: make lint
+
+      - name: Type-check
+        run: make types
+
+      - name: Test
+        run: make test
+
+      - name: Smoke-test the installed console script
+        env:
+          DTCALC_NOW: 2026-05-23T12:15:13
+          DTCALC_TZ: America/New_York
+        run: |
+          uv run dtcalc --version
+          test "$(uv run dtcalc 'now + 7h')" = "2026-05-23T19:15:13-04:00  America/New_York"
+          test "$(uv run dtcalc '8h * 3')" = "24h"
+          test "$(uv run dtcalc '2026-05-23T12:15:13 - 12:15')" = "2026-05-23T00:00:13-04:00  America/New_York"

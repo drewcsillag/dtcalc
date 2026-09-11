@@ -1,0 +1,64 @@
+dtcalc> :fmt
+format is iso, 24h clock
+dtcalc> now
+2026-05-23T12:15:13-04:00  America/New_York
+dtcalc> # timeonly drops the date, for arithmetic where the date is not the point.
+dtcalc> :fmt timeonly
+format is now timeonly, 24h clock
+dtcalc> now
+12:15:13 EDT
+dtcalc> now @ 4p
+16:00:00 EDT
+dtcalc> # ...but marks a rollover, so it cannot look like a time this morning.
+dtcalc> now + 20h
+08:15:13 EDT (+1d)
+dtcalc> now - 20h
+16:15:13 EDT (-1d)
+dtcalc> now + 7d
+12:15:13 EDT (+7d)
+dtcalc> # The 12-hour clock applies to timeonly and human.
+dtcalc> :fmt 12h
+format is now timeonly, 12h clock
+dtcalc> now
+12:15:13 PM EDT
+dtcalc> now @ 12a
+12:00:00 AM EDT
+dtcalc> now @ 12p
+12:00:00 PM EDT
+dtcalc> :fmt human
+format is now human, 12h clock
+dtcalc> now
+Sat 2026-05-23 12:15:13 PM EDT
+dtcalc> :fmt human 24h
+format is now human, 24h clock
+dtcalc> now
+Sat 2026-05-23 12:15:13 EDT
+dtcalc> # It deliberately does not apply to iso, which would stop being ISO 8601.
+dtcalc> :fmt iso 12h
+format is now iso, 12h clock
+dtcalc> now
+2026-05-23T12:15:13-04:00  America/New_York
+dtcalc> # unix has no clock at all.
+dtcalc> :fmt unix
+format is now unix, 12h clock
+dtcalc> now
+1779552913
+dtcalc> 1h30m
+5400
+dtcalc> :fmt iso 24h
+format is now iso, 24h clock
+dtcalc> now
+2026-05-23T12:15:13-04:00  America/New_York
+dtcalc> # Durations, numbers and booleans are unaffected by either setting.
+dtcalc> :fmt timeonly 12h
+format is now timeonly, 12h clock
+dtcalc> 3w2h5m
+3w2h5m
+dtcalc> 2h / 15m
+8
+dtcalc> 1h < 2h
+true
+dtcalc> :fmt sideways
+error: unknown setting 'sideways'; formats are iso, human, unix, timeonly; clocks are 24h, 12h
+dtcalc> :fmt 13h
+error: unknown setting '13h'; formats are iso, human, unix, timeonly; clocks are 24h, 12h

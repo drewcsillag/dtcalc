@@ -1,0 +1,62 @@
+dtcalc> # Meridiem literals: 12-hour clock readings.
+dtcalc> 4p
+2026-05-23T16:00:00-04:00  America/New_York
+dtcalc> 4a
+2026-05-23T04:00:00-04:00  America/New_York
+dtcalc> 4pm
+2026-05-23T16:00:00-04:00  America/New_York
+dtcalc> 4:30p
+2026-05-23T16:30:00-04:00  America/New_York
+dtcalc> 4:30:15pm
+2026-05-23T16:30:15-04:00  America/New_York
+dtcalc> 11:59:59p
+2026-05-23T23:59:59-04:00  America/New_York
+dtcalc> # The two everyone gets wrong.
+dtcalc> 12a
+2026-05-23T00:00:00-04:00  America/New_York
+dtcalc> 12p
+2026-05-23T12:00:00-04:00  America/New_York
+dtcalc> # `@` with a time keeps the date and replaces the time.
+dtcalc> now @ 16:00
+2026-05-23T16:00:00-04:00  America/New_York
+dtcalc> now @ 4p
+2026-05-23T16:00:00-04:00  America/New_York
+dtcalc> now @ 4a
+2026-05-23T04:00:00-04:00  America/New_York
+dtcalc> tomorrow @ 9:15
+2026-05-24T09:15:00-04:00  America/New_York
+dtcalc> upcoming friday @ 4p
+2026-05-29T16:00:00-04:00  America/New_York
+dtcalc> (now + 1d) @ 17:00
+2026-05-24T17:00:00-04:00  America/New_York
+dtcalc> deploy = 2026-07-04T09:00
+2026-07-04T09:00:00-04:00  America/New_York
+dtcalc> deploy @ 4p
+2026-07-04T16:00:00-04:00  America/New_York
+dtcalc> # It composes with conversion and arithmetic.
+dtcalc> now @ 4p in Tokyo
+2026-05-24T05:00:00+09:00  Asia/Tokyo
+dtcalc> (now @ 16:00) - (now @ 12:00)
+4h
+dtcalc> now @ 4p + 90m
+2026-05-23T17:30:00-04:00  America/New_York
+dtcalc> # `@` with a zone still attaches a zone.
+dtcalc> 12:13 @ sf
+2026-05-23T15:13:00-04:00  America/New_York
+dtcalc> # Errors.
+dtcalc> now @ 5h
+error: expected a timezone name or a time of day after '@' but found '5h'
+  now @ 5h
+        ^^
+dtcalc> 0p
+error: 0 is not an hour on a 12-hour clock
+  0p
+  ^^
+dtcalc> 13p
+error: 13 is not an hour on a 12-hour clock
+  13p
+  ^^^
+dtcalc> 4:60p
+error: '4:60p' is not a time of day
+  4:60p
+  ^^^^^

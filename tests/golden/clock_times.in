@@ -1,0 +1,30 @@
+# Meridiem literals: 12-hour clock readings.
+4p
+4a
+4pm
+4:30p
+4:30:15pm
+11:59:59p
+# The two everyone gets wrong.
+12a
+12p
+# `@` with a time keeps the date and replaces the time.
+now @ 16:00
+now @ 4p
+now @ 4a
+tomorrow @ 9:15
+upcoming friday @ 4p
+(now + 1d) @ 17:00
+deploy = 2026-07-04T09:00
+deploy @ 4p
+# It composes with conversion and arithmetic.
+now @ 4p in Tokyo
+(now @ 16:00) - (now @ 12:00)
+now @ 4p + 90m
+# `@` with a zone still attaches a zone.
+12:13 @ sf
+# Errors.
+now @ 5h
+0p
+13p
+4:60p

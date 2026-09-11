@@ -1,0 +1,57 @@
+dtcalc> # The exact ladder cascades up to hours and stops there.
+dtcalc> 90m
+1h30m
+dtcalc> 3661s
+1h1m1s
+dtcalc> 24h
+24h
+dtcalc> 168h
+168h
+dtcalc> 250ms
+250ms
+dtcalc> 1.5s
+1.5s
+dtcalc> 1m1.5s
+1m1.5s
+dtcalc> # Calendar days and weeks are their own ladder.
+dtcalc> 8d
+1w1d
+dtcalc> 7d
+1w
+dtcalc> 3w2h5m
+3w2h5m
+dtcalc> # So are months and years.
+dtcalc> 15mo
+1y3mo
+dtcalc> 12mo
+1y
+dtcalc> # Business days are their own ladder again.
+dtcalc> 3bd
+3bd
+dtcalc> 1bd2h
+1bd2h
+dtcalc> 3bd * 2
+6bd
+dtcalc> # Mixed signs keep their own signs rather than pretending to reduce.
+dtcalc> 1d - 90m
+1d -1h30m
+dtcalc> # Arithmetic and division.
+dtcalc> 3h + 45m
+3h45m
+dtcalc> 2h / 15m
+8
+dtcalc> 24h / 4
+6h
+dtcalc> 97m % 15m
+7m
+dtcalc> 15h / 3h
+5
+dtcalc> # Comparison uses a nominal 24-hour day, but only for days and weeks.
+dtcalc> 1d < 25h
+true
+dtcalc> 1d == 24h
+true
+dtcalc> 1mo < 720h
+error: cannot compare 1mo with 720h: months have no fixed length, so there is no answer that is always right
+  1mo < 720h
+  ^^^^^^^^^^

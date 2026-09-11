@@ -1,0 +1,15 @@
+:vars
+foo = now
+bar = foo + 5h
+gap = bar - foo
+ok = foo < bar
+:vars
+:fmt human
+foo
+bar
+:fmt unix
+foo
+gap
+:fmt iso
+foo
+:help

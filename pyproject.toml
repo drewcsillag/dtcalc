@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+# The distribution is `dtcalc-cli` because `dtcalc` was already taken on PyPI
+# by an unrelated 2021 package. The import package and the installed command
+# are both still `dtcalc`.
+name = "dtcalc-cli"
+dynamic = ["version"]
+description = "An interactive REPL for date, time, duration and timezone calculations"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.13"
+authors = [{ name = "Drew Csillag" }]
+keywords = ["datetime", "duration", "timezone", "repl", "calculator"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Utilities",
+]
+# Intentionally empty: dtcalc has no runtime dependencies.
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/drewcsillag/dtcalc"
+Repository = "https://github.com/drewcsillag/dtcalc"
+
+[project.scripts]
+dtcalc = "dtcalc.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "hypothesis>=6.100",
+    "pexpect>=4.9",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+# Single source of truth for the version: the module itself, so the packaging
+# metadata and `dtcalc --version` cannot drift apart.
+[tool.hatch.version]
+path = "src/dtcalc/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dtcalc"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = "pexpect.*"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

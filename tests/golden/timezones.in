@@ -1,0 +1,17 @@
+# @ reads a wall clock in another zone; in shows an instant in another zone.
+12:13 @ SanFrancisco
+now in Tokyo
+now in America/Los_Angeles
+now in utc
+12:13 @ sf in Tokyo
+# Aliases, abbreviations and a unique substring all resolve.
+now in nyc
+now in PST
+now in Reykjavik
+# Precedence: @ binds tightest, in binds loosest.
+12:13 @ sf + 2h in Tokyo
+(now + 1d) in Tokyo
+:zones tokyo
+:tz Tokyo
+now
+:tz nyc

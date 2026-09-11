@@ -1,0 +1,106 @@
+dtcalc> now +
+error: expected an expression but the line ended
+  now +
+       ^
+dtcalc> (now + 1h
+error: missing a closing parenthesis for this one
+  (now + 1h
+  ^
+dtcalc> now + 1h)
+error: unexpected ')' after a complete expression
+  now + 1h)
+          ^
+dtcalc> now + now
+error: cannot add two instants; subtract them to get the time between
+  now + now
+  ^^^^^^^^^
+dtcalc> 5h in Tokyo
+error: can only convert an instant, not a duration
+  5h in Tokyo
+  ^^
+dtcalc> -now
+error: cannot negate an instant
+  -now
+  ^^^^
+dtcalc> now * 2
+error: cannot multiply an instant by a number
+  now * 2
+  ^^^^^^^
+dtcalc> 1mo / 4
+error: 1 month does not divide evenly by 4; calendar units have no fixed length, so there is no exact answer
+  1mo / 4
+  ^^^^^^^
+dtcalc> 1d % 5h
+error: can only take the modulo of durations in the same single ladder; 1d and 5h are not
+  1d % 5h
+  ^^^^^^^
+dtcalc> 1h / 0
+error: cannot divide a duration by zero
+  1h / 0
+  ^^^^^^
+dtcalc> now in Atlantis
+error: unknown timezone 'Atlantis'
+  now in Atlantis
+  ^^^^^^^^^^^^^^^
+dtcalc> now < 1h
+error: cannot compare an instant with a duration
+  now < 1h
+  ^^^^^^^^
+dtcalc> nope + 1h
+error: undefined variable 'nope'
+  nope + 1h
+  ^^^^
+dtcalc> h = 3h
+error: 'h' is a unit, not a name; units need a number in front of them
+  h = 3h
+  ^
+dtcalc> min = 3h
+error: 'min' is a builtin function, so it cannot be a variable name
+  min = 3h
+  ^^^^^^^^
+dtcalc> now = 3h
+error: 'now' is a keyword, so it cannot be a variable name
+  now = 3h
+  ^^^
+dtcalc> a < b < c
+error: comparisons do not chain; compare two things at a time
+  a < b < c
+        ^
+dtcalc> 12:15s
+error: a colon literal's leading unit must be 'h' or 'm', not 's'
+  12:15s
+  ^^^^^^
+dtcalc> 1:2:3:4
+error: too many fields in '1:2:3:4': a colon literal has at most three
+  1:2:3:4
+  ^^^^^^^
+dtcalc> 32nd
+error: 32 is not a day of the month
+  32nd
+  ^^^^
+dtcalc> 5hfoo
+error: '5hfoo' is not a valid literal
+  5hfoo
+  ^^^^^
+dtcalc> now + 7h $
+error: unexpected character '$'
+  now + 7h $
+           ^
+dtcalc> nope(now)
+error: unknown function 'nope'; the ones there are: ceil, diff, epoch, epochms, max, min, round, trunc, unix
+  nope(now)
+  ^^^^^^^^^
+dtcalc> diff(now)
+error: diff takes 2 arguments but was given 1
+  diff(now)
+  ^^^^^^^^^
+dtcalc> trunc(now, 1mo)
+error: trunc cannot use 1mo as a granularity for an instant: months and years have no fixed length, so there is nothing to round to
+  trunc(now, 1mo)
+  ^^^^^^^^^^^^^^^
+dtcalc> :nope
+error: unknown command ':nope'; try :help
+dtcalc> :fmt sideways
+error: unknown setting 'sideways'; formats are iso, human, unix, timeonly; clocks are 24h, 12h
+dtcalc> :tz Atlantis
+error: unknown timezone 'Atlantis'

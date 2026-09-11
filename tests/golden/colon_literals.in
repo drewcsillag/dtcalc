@@ -1,0 +1,19 @@
+# A bare colon literal is a clock reading where that typechecks...
+12:15
+12:13 in Tokyo
+# ...and a duration where only that does.
+now - 12:15
+12:15 * 2
+-12:15
+# Both readings typecheck here, so the tie-break picks the clock reading.
+12:15 + 3h
+# The two explicit forms force a duration, and name the leading unit.
+12:15h
+12:15m
+:12:15
+::15
+1:02:03
+12:15:13.5 in Tokyo
+# An impossible clock reading is fine as a duration.
+now + 25:00
+25:00 in Tokyo

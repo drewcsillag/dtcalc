@@ -1,0 +1,15 @@
+trunc(now, 1h)
+round(now, 15m)
+ceil(now, 1d)
+trunc(now, 1w)
+trunc(now, 7h)
+round(97m, 15m)
+ceil(10d, 1w)
+round(14mo, 1y)
+min(now, now + 1h, now - 2h)
+max(3h, 45m, 2h)
+a = 2026-11-01T00:30
+b = 2026-11-02T00:30
+diff(a, b)
+b - a
+diff(2026-01-15T10:00, 2026-02-18T14:00)

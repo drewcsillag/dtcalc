@@ -1,0 +1,51 @@
+dtcalc> :vars
+(no variables set)
+dtcalc> foo = now
+2026-05-23T12:15:13-04:00  America/New_York
+dtcalc> bar = foo + 5h
+2026-05-23T17:15:13-04:00  America/New_York
+dtcalc> gap = bar - foo
+5h
+dtcalc> ok = foo < bar
+true
+dtcalc> :vars
+bar  2026-05-23T17:15:13-04:00  America/New_York
+foo  2026-05-23T12:15:13-04:00  America/New_York
+gap  5h
+ok   true
+dtcalc> :fmt human
+format is now human, 24h clock
+dtcalc> foo
+Sat 2026-05-23 12:15:13 EDT
+dtcalc> bar
+Sat 2026-05-23 17:15:13 EDT
+dtcalc> :fmt unix
+format is now unix, 24h clock
+dtcalc> foo
+1779552913
+dtcalc> gap
+18000
+dtcalc> :fmt iso
+format is now iso, 24h clock
+dtcalc> foo
+2026-05-23T12:15:13-04:00  America/New_York
+dtcalc> :help
+values      instants, durations, numbers, booleans
+instants    now, today, tomorrow, yesterday, 2026-05-23T12:15:13,
+            2026-05-23, today 09:00, upcoming friday, previous 15th,
+            epoch(1789073107), epochms(...)
+clock times 12:15 or 16:00, and 4p 4a 4pm 4:30pm (12a is midnight,
+            12p is noon)
+durations   3w2h5m, 250ms, 1.5s, 3bd  (ms s m h | d w | mo y | bd)
+colon forms 12:15 is 12h15m or 12:15:00 depending on context;
+            12:15m is 12m15s, :12:15 is 12m15s, ::15 is 15s
+operators   + - * / %, comparisons, in (show in a zone)
+            @ attaches a zone (12:13 @ sf) or a time (foo @ 4p, which
+            keeps foo's date and changes the time)
+            tightest first: @  then * / %  then + -  then compare  then in
+functions   ceil, diff, epoch, epochms, max, min, round, trunc, unix
+ladders     ms/s/m/h are exact; d/w and mo/y are calendar; bd is business
+            days.  They never convert, so 8h * 3 is 24h and never 1d.
+commands    :help  :vars  :zones <text>  :tz <zone>  :q
+            :fmt iso|human|unix|timeonly and/or 24h|12h
+            (the clock applies to human and timeonly, not to iso)
