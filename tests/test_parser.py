@@ -33,7 +33,7 @@ def s(source: str) -> str:
         ("tomorrow", "tomorrow"),
         ("yesterday", "yesterday"),
         ("foo", "foo"),
-        ("2026-05-23", "dt(2026-05-23)"),
+        ("2026-05-23", "date(2026-05-23)"),
         ("2026-05-23T12:15:13", "dt(2026-05-23T12:15:13)"),
         ("12:15", "colon(12:15)"),
         ("upcoming friday", "upcoming(friday)"),

@@ -44,13 +44,49 @@ import, are both still `dtcalc`.
 | `… \| dtcalc` | evaluate each line of stdin |
 | `… \| dtcalc --transcript` | the same, echoing each line with a prompt |
 
+`--tz ZONE` sets the working zone for a single invocation, overriding
+`DTCALC_TZ`.
+
 In piped mode an error on one line does not stop the rest, but the process
 still exits non-zero — so a batch of expressions is scriptable without
 mistakes passing silently.
 
 ## Values
 
-Four types: **instants**, **durations**, **numbers** and **booleans**.
+Five types: **dates**, **instants**, **durations**, **numbers** and
+**booleans**.
+
+### Dates
+
+A date is a calendar day — no time, and no zone. That last part is why
+subtracting two dates answers in days rather than hours:
+
+```
+dtcalc> 2027-01-03 - 2026-12-24
+10d
+dtcalc> upcoming friday - today
+6d
+```
+
+A bare date literal is a date, and so are `today`, `tomorrow`, `yesterday`,
+`upcoming friday` and `previous 15th`.
+
+A date **stays** a date under calendar arithmetic, and becomes an instant the
+moment something names a time:
+
+| Expression | Result |
+| --- | --- |
+| `2026-12-24 + 1d`, `+ 2w`, `+ 1mo`, `+ 1y`, `+ 3bd` | a date |
+| `2026-12-24 + 0s` | a date — the exact part is zero, so no moment is named |
+| `2026-12-24 + 3h`, `+ 1d3h` | an instant |
+| `2026-12-24 @ 12:00`, `@ 4p` | an instant |
+| `2026-12-24 in Tokyo`, `@ Tokyo` | an instant — midnight *there* |
+
+The rule in one line: a date plus a duration stays a date unless the duration
+has an exact (`ms`/`s`/`m`/`h`) part.
+
+Mixing a date with an instant promotes the date to midnight in the working
+zone, so `now - today` and `today < now` both work.
 
 ### Instants
 
@@ -221,12 +257,23 @@ dtcalc> diff(a, b)
 Both answers are right. That day really was 25 hours long, and it really was
 one day.
 
-Rounding an instant is anchored at **midnight in the display zone**. An exact
-granularity (`15m`, `7h`) buckets elapsed time from there; a calendar
-granularity (`1d`, `1w`) buckets whole local dates, so `trunc(x, 1d)` is
-midnight even on a 23- or 25-hour day. Week buckets land on Monday. Months,
-years and business days are refused as granularities for an instant, because
-there is no anchor from which they are a fixed distance.
+**The granularity decides the result type.** An exact granularity (`15m`,
+`7h`) buckets elapsed time from midnight in the working zone and gives an
+instant; a calendar granularity (`1d`, `1w`, `1mo`, `1y`) buckets whole
+calendar days or months and gives a **date**:
+
+```
+dtcalc> trunc(now, 1h)
+2026-05-23T12:00:00-04:00  America/New_York
+dtcalc> trunc(now, 1d)
+2026-05-23
+dtcalc> trunc(now, 1mo)
+2026-05-01
+```
+
+Week buckets land on Monday. An exact granularity applied to a *date* is an
+error — a date has no time of day to round — and a business day is never a
+granularity, having no position within a month or year to bucket by.
 
 ## Variables
 
@@ -249,7 +296,7 @@ be used as variable names.
 | `:help` | the language, in one screen |
 | `:vars` | list the variables |
 | `:zones <text>` | search timezone names |
-| `:tz <zone>` | set the display zone |
+| `:tz <zone>` | set the working zone |
 | `:fmt <format>`, `<clock>`, `<grouping>` | `iso`, `human`, `unix`, `timeonly`; `24h`, `12h`; `weeks`, `noweeks` |
 | `:q` | quit (so does Ctrl-D) |
 
@@ -259,12 +306,17 @@ another colon it is a value, which is what lets `:help` and `:12:15` coexist.
 `:fmt` takes a format, a clock convention, or both — `:fmt timeonly 12h`,
 or `:fmt 12h` to change only the convention.
 
-| Format | `now` renders as |
-| --- | --- |
-| `iso` | `2026-05-23T12:15:13-04:00  America/New_York` |
-| `human` | `Sat 2026-05-23 12:15:13 EDT` |
-| `timeonly` | `12:15:13 EDT` |
-| `unix` | `1779552913` |
+| Format | `now` renders as | a date renders as |
+| --- | --- | --- |
+| `iso` | `2026-05-23T12:15:13-04:00  America/New_York` | `2026-12-24` |
+| `human` | `Sat 2026-05-23 12:15:13 EDT` | `Thu 2026-12-24` |
+| `timeonly` | `12:15:13 EDT` | `2026-12-24` |
+| `unix` | `1779552913` | midnight-local epoch |
+
+Neither the clock nor the week setting touches a date: it has no time of day
+and no day ladder of its own. `unix` is the one place a date acquires a zone
+implicitly — midnight in the working zone — because asking for an epoch is an
+explicit request for a moment.
 
 `iso`, `human` and `unix` always print the full date, so arithmetic that
 rolled over into another day is visible. **`timeonly`** drops it, for
@@ -314,6 +366,22 @@ dtcalc> 10d
 
 The toggle reaches the day ladder only — `15mo` is `1y3mo` either way,
 because years group more naturally than weeks do.
+
+## The working zone
+
+`:tz`, `--tz` and `DTCALC_TZ` set the **working** zone, not merely a display
+zone: it governs the arithmetic as well as the rendering. The same instant is
+a different `today` in each zone —
+
+```
+$ DTCALC_TZ=America/New_York dtcalc today
+2026-05-23
+$ DTCALC_TZ=UTC dtcalc today
+2026-05-24
+```
+
+— so if you want everything done in UTC, `export DTCALC_TZ=UTC` is all it
+takes.
 
 ## Two decisions worth explaining
 

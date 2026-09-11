@@ -39,4 +39,5 @@ class Env:
             clock=self.clock_style,
             group_weeks=self.group_weeks,
             today=self.clock.now().astimezone(self.zone).date(),
+            zone=self.zone,
         )

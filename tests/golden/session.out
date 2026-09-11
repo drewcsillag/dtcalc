@@ -9,10 +9,10 @@ dtcalc> gap = bar - foo
 dtcalc> ok = foo < bar
 true
 dtcalc> :vars
-bar  2026-05-23T17:15:13-04:00  America/New_York
-foo  2026-05-23T12:15:13-04:00  America/New_York
-gap  5h
-ok   true
+bar  instant   2026-05-23T17:15:13-04:00  America/New_York
+foo  instant   2026-05-23T12:15:13-04:00  America/New_York
+gap  duration  5h
+ok   boolean   true
 dtcalc> :fmt human
 format is now human, 24h clock, no week grouping
 dtcalc> foo
@@ -30,7 +30,10 @@ format is now iso, 24h clock, no week grouping
 dtcalc> foo
 2026-05-23T12:15:13-04:00  America/New_York
 dtcalc> :help
-values      instants, durations, numbers, booleans
+values      dates, instants, durations, numbers, booleans
+dates       2026-12-24, today, tomorrow, upcoming friday, previous 15th.
+            A date stays a date under +1d/+1mo/+3bd and becomes an
+            instant once a time or a zone is named (@ 4p, in Tokyo).
 instants    now, today, tomorrow, yesterday, 2026-05-23T12:15:13,
             2026-05-23, today 09:00, upcoming friday, previous 15th,
             epoch(1789073107), epochms(...)
@@ -47,7 +50,7 @@ functions   ceil, diff, epoch, epochms, max, min, round, trunc, unix
 ladders     ms/s/m/h are exact; d/w and mo/y are calendar; bd is business
             days.  They never convert, so 8h * 3 is 24h and never 1d.
             Days do not group into weeks unless you ask (:fmt weeks).
-commands    :help  :vars  :zones <text>  :tz <zone>  :q
+commands    :help  :vars  :zones <text>  :tz <working zone>  :q
             :fmt iso|human|unix|timeonly, 24h|12h, weeks|noweeks
             (the clock applies to human and timeonly, not to iso;
              weeks groups days, so 10d shows as 1w3d)

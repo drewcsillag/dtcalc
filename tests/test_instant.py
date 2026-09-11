@@ -274,3 +274,17 @@ def test_walking_off_the_end_of_the_datetime_range_is_a_clean_error(
 def test_overflow_from_multiplication_is_also_clean() -> None:
     with pytest.raises(DtcalcError, match="out of range"):
         _ = inst(NY, "2026-05-23T12:00:00") + D(y=1000) * 1000.0
+
+
+def test_diff_is_invertible_in_both_directions() -> None:
+    """Regression, found by a property test.
+
+    `diff` used to compute the backward case by negating the forward one, but
+    negating a months-plus-days duration is not its inverse: month steps clamp
+    the day of month, so Jan 2 +1mo +28d is Mar 1 while Mar 1 -1mo -28d is
+    Jan 4. Each direction is decomposed on its own now.
+    """
+    a = inst(NY, "2000-03-01T00:00:00")
+    b = inst(NY, "2000-01-02T00:00:00")
+    assert (b + b.diff(a)).moment == a.moment
+    assert (a + a.diff(b)).moment == b.moment

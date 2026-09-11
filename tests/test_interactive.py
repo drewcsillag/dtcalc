@@ -172,3 +172,18 @@ def test_ctrl_a_then_typing_edits_the_front_of_the_line(repl: Any) -> None:
     repl.send("3h ")
     repl.sendline("")
     repl.expect_exact("5h")
+
+
+def test_a_date_renders_as_a_date_in_the_repl(repl: Any) -> None:
+    repl.sendline("2027-01-03 - 2026-12-24")
+    repl.expect_exact("10d")
+    repl.sendline("today")
+    repl.expect_exact("2026-05-23")
+
+
+def test_vars_shows_the_kind_column(repl: Any) -> None:
+    repl.sendline("birthday = 2026-12-24")
+    repl.expect_exact(PROMPT)
+    repl.sendline(":vars")
+    repl.expect_exact("birthday")
+    repl.expect_exact("date")

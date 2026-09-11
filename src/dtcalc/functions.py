@@ -14,12 +14,14 @@ all, so they are refused as granularities rather than approximated.
 
 from __future__ import annotations
 
+from calendar import monthrange
 from collections.abc import Callable
-from datetime import date as Date
+from datetime import date as StdDate
 from datetime import datetime, time, timedelta
 from typing import Final
 
 from dtcalc.ast import Node
+from dtcalc.date import Date
 from dtcalc.duration import Duration
 from dtcalc.env import Env
 from dtcalc.errors import DtcalcError
@@ -29,11 +31,12 @@ from dtcalc.values import Number, Value, kind_of
 __all__ = ["call_builtin"]
 
 _MS_PER_DAY: Final = 86_400_000
+_MONTHS_PER_YEAR: Final = 12
 
 # Day buckets are counted from a Monday, so that `trunc(x, 1w)` lands on the
 # Monday of x's week rather than on whatever weekday 1970-01-01 happened to
 # be (a Thursday).
-_DAY_ORIGIN: Final = Date(1969, 12, 29)
+_DAY_ORIGIN: Final = StdDate(1969, 12, 29)
 
 _ROUNDERS: Final[dict[str, Callable[[float], int]]] = {
     "trunc": lambda q: int(q // 1),
@@ -59,7 +62,7 @@ def call_builtin(name: str, args: tuple[Value, ...], node: Node, env: Env) -> Va
             case "epochms":
                 return _from_epoch(args[0], 1, env)
             case "unix":
-                return _to_epoch(args[0])
+                return _to_epoch(args[0], env)
             case _:  # pragma: no cover - resolution rejects unknown names
                 raise AssertionError(f"unregistered builtin {name!r}")
     except DtcalcError as exc:
@@ -86,6 +89,8 @@ def _extreme(args: tuple[Value, ...], *, want_max: bool) -> Value:
 
 def _greater(left: Value, right: Value) -> bool:
     match left, right:
+        case Date(), Date():
+            return left > right
         case Instant(), Instant():
             return left.moment > right.moment
         case Duration(), Duration():
@@ -93,7 +98,7 @@ def _greater(left: Value, right: Value) -> bool:
         case Number(), Number():
             return left.value > right.value
         case _:
-            raise DtcalcError("min and max need instants, durations or numbers")
+            raise DtcalcError("min and max need dates, instants, durations or numbers")
 
 
 # --------------------------------------------------------------------------
@@ -109,23 +114,81 @@ def _round(name: str, value: Value, granularity: Value, env: Env) -> Value:
     if _is_negative(granularity):
         raise DtcalcError(f"{name} needs a positive granularity, not {granularity}")
 
+    if granularity.bdays:
+        raise DtcalcError(
+            f"{name} cannot use {granularity} as a granularity: a business day has "
+            f"no position within a month or a year to bucket by"
+        )
+
     rounder = _ROUNDERS[name]
-    if isinstance(value, Instant):
-        # Rounding an instant needs a granularity that maps onto the calendar.
-        # Months, years and business days do not: there is no anchor from
-        # which "the nearest month boundary" is a fixed distance away.
-        if granularity.months or granularity.bdays:
-            culprit = "months and years" if granularity.months else "business days"
-            raise DtcalcError(
-                f"{name} cannot use {granularity} as a granularity for an instant: "
-                f"{culprit} have no fixed length, so there is nothing to round to"
-            )
-        return _round_instant(value, granularity, rounder, env)
     if isinstance(value, Duration):
         # Rounding a duration is pure arithmetic within one ladder, so
-        # `round(14mo, 1y)` is perfectly well defined.
+        # `round(14mo, 1y)` is well defined.
         return _round_duration(value, granularity, rounder, name)
-    raise DtcalcError(f"{name} needs an instant or a duration, not a {kind_of(value)}")
+
+    if isinstance(value, Date):
+        if granularity.millis:
+            raise DtcalcError(
+                f"{name} cannot use {granularity} as a granularity for a date: "
+                f"a date has no time of day to round"
+            )
+        return _round_date(value, granularity, rounder, name)
+
+    if isinstance(value, Instant):
+        if granularity.millis:
+            return _round_instant(value, granularity, rounder, env)
+        # A day-or-coarser bucket names a calendar day, so the answer is a
+        # date.  This is what makes `trunc(now, 1mo)` legal.
+        #
+        # The time of day is carried across as a fraction rather than
+        # dropped: without it, `ceil(now, 1d)` would see a date already on a
+        # boundary and answer today instead of tomorrow.
+        wall = value.wall_clock()
+        fraction = (wall - datetime.combine(wall.date(), time())) / timedelta(days=1)
+        return _round_date(
+            Date.from_std(wall.date()), granularity, rounder, name, fraction=fraction
+        )
+
+    raise DtcalcError(f"{name} needs an instant, a date or a duration, not a {kind_of(value)}")
+
+
+def _round_date(
+    value: Date,
+    granularity: Duration,
+    rounder: Callable[[float], int],
+    name: str,
+    *,
+    fraction: float = 0.0,
+) -> Date:
+    """Bucket a calendar date by days, weeks, months or years.
+
+    ``fraction`` is how far into the day the original value sat, which only
+    an instant has.  It matters to ``ceil`` and ``round``: a value already on
+    a bucket boundary must stay put, while one part-way through must not.
+    """
+    if granularity.months:
+        if granularity.days:
+            raise DtcalcError(
+                f"{name} needs a granularity in one ladder; {granularity} mixes "
+                f"months with days, which have no fixed ratio"
+            )
+        # Months counted from year zero, so `1y` lands on 1 January and `1mo`
+        # on the first of the month.
+        months = value.year * _MONTHS_PER_YEAR + value.month - 1
+        position = months + _month_fraction(value, fraction)
+        buckets = rounder(position / granularity.months)
+        total = buckets * granularity.months
+        return Date(total // _MONTHS_PER_YEAR, total % _MONTHS_PER_YEAR + 1, 1)
+
+    offset = (value.to_std() - _DAY_ORIGIN).days + fraction
+    buckets = rounder(offset / granularity.days)
+    return Date.from_std(_DAY_ORIGIN + timedelta(days=buckets * granularity.days))
+
+
+def _month_fraction(value: Date, day_fraction: float) -> float:
+    """How far into its month a date sits, so ceil and round see a part-month."""
+    days_in_month = monthrange(value.year, value.month)[1]
+    return (value.day - 1 + day_fraction) / days_in_month
 
 
 def _is_negative(granularity: Duration) -> bool:
@@ -193,9 +256,18 @@ def _round_duration(
 
 
 def _diff(left: Value, right: Value) -> Duration:
-    if not isinstance(left, Instant) or not isinstance(right, Instant):
-        raise DtcalcError("diff needs two instants")
-    return left.diff(right)
+    match left, right:
+        case Date(), Date():
+            return left.diff(right)
+        case Instant(), Instant():
+            return left.diff(right)
+        case ((Date() | Instant()), (Date() | Instant())):
+            raise DtcalcError(
+                "diff needs both arguments to be the same kind; mixing a date with "
+                "an instant leaves it ambiguous which calendar to decompose against"
+            )
+        case _:
+            raise DtcalcError("diff needs two dates or two instants")
 
 
 def _from_epoch(value: Value, scale: int, env: Env) -> Instant:
@@ -208,7 +280,16 @@ def _from_epoch(value: Value, scale: int, env: Env) -> Instant:
     return Instant(moment, env.zone)
 
 
-def _to_epoch(value: Value) -> Number:
+def _to_epoch(value: Value, env: Env) -> Number:
+    """Unix seconds.
+
+    A date has no zone, so this is the one place a date acquires one
+    implicitly: midnight in the working zone, which ``:tz`` reports.  Asking
+    for an epoch is an explicit request for a moment, so answering beats
+    refusing.
+    """
+    if isinstance(value, Date):
+        return Number(value.at_midnight(env.zone).moment.timestamp())
     if not isinstance(value, Instant):
-        raise DtcalcError("unix needs an instant")
+        raise DtcalcError(f"unix needs a date or an instant, not a {kind_of(value)}")
     return Number(value.moment.timestamp())

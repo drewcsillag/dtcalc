@@ -192,8 +192,11 @@ def sexpr(node: Node) -> str:
         case TimeOfDay(hour=h, minute=m, second=s, microsecond=us):
             fraction = f".{us:06d}".rstrip("0") if us else ""
             return f"tod({h:02d}:{m:02d}:{s:02d}{fraction})"
-        case DateTimeLit(text=text):
-            return f"dt({text})"
+        case DateTimeLit(literal=literal, text=text):
+            # Distinguished because this is precisely the distinction the
+            # language now draws; --dump-ast is where you look when a
+            # promotion goes the wrong way.
+            return f"dt({text})" if literal.has_time else f"date({text})"
         case NowLit():
             return "now"
         case DayKeyword(name=name):

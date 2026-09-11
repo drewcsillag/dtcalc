@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from dtcalc.clock import FixedClock
+from dtcalc.date import Date
 from dtcalc.duration import Duration
 from dtcalc.env import Env
 from dtcalc.errors import DtcalcError
@@ -33,6 +34,12 @@ def wall(env: Env, source: str) -> str:
     value = ev(env, source)
     assert isinstance(value, Instant)
     return value.wall_clock().isoformat()
+
+
+def date_of(env: Env, source: str) -> str:
+    value = ev(env, source)
+    assert isinstance(value, Date), f"{source} gave {value!r}"
+    return str(value)
 
 
 def dur(env: Env, source: str) -> str:
@@ -110,28 +117,41 @@ def test_rounding_an_instant_to_an_exact_granularity(env: Env, source: str, expe
 @pytest.mark.parametrize(
     ("source", "expected"),
     [
-        ("trunc(now, 1d)", "2026-05-23T00:00:00"),
-        ("ceil(now, 1d)", "2026-05-24T00:00:00"),
-        ("round(now, 1d)", "2026-05-24T00:00:00"),
+        ("trunc(now, 1d)", "2026-05-23"),
+        ("ceil(now, 1d)", "2026-05-24"),
+        ("round(now, 1d)", "2026-05-24"),
         # Week buckets are anchored on Monday; 2026-05-23 is a Saturday.
-        ("trunc(now, 1w)", "2026-05-18T00:00:00"),
-        ("ceil(now, 1w)", "2026-05-25T00:00:00"),
+        ("trunc(now, 1w)", "2026-05-18"),
+        ("ceil(now, 1w)", "2026-05-25"),
+        # Month and year buckets, which used to be refused outright.
+        ("trunc(now, 1mo)", "2026-05-01"),
+        ("ceil(now, 1mo)", "2026-06-01"),
+        ("trunc(now, 1y)", "2026-01-01"),
+        ("ceil(now, 1y)", "2027-01-01"),
     ],
 )
-def test_rounding_an_instant_to_a_calendar_granularity(
-    env: Env, source: str, expected: str
-) -> None:
-    assert wall(env, source) == expected
+def test_a_calendar_granularity_yields_a_date(env: Env, source: str, expected: str) -> None:
+    """The granularity decides the result type: a day-or-coarser bucket names
+    a calendar day, so the answer is a date rather than a midnight instant."""
+    assert date_of(env, source) == expected
 
 
-def test_rounding_down_to_a_day_lands_on_midnight_even_on_a_short_day(env: Env) -> None:
-    """2026-03-08 in New York is 23 hours long, so a 24h bucket would miss."""
-    assert wall(env, "trunc(2026-03-08T23:30, 1d)") == "2026-03-08T00:00:00"
+def test_month_and_year_granularities_used_to_be_refused(env: Env) -> None:
+    """They only ever errored because the result had to be an instant, and a
+    month has no fixed length. A date needs none."""
+    assert date_of(env, "trunc(now, 1mo)") == "2026-05-01"
+    assert date_of(env, "trunc(today, 1y)") == "2026-01-01"
 
 
-def test_rounding_down_to_a_day_lands_on_midnight_even_on_a_long_day(env: Env) -> None:
+def test_rounding_down_to_a_day_is_unaffected_by_a_short_day(env: Env) -> None:
+    """2026-03-08 in New York is 23 hours long. The answer is a date, which
+    has no time of day for a clock change to shift."""
+    assert date_of(env, "trunc(2026-03-08T23:30, 1d)") == "2026-03-08"
+
+
+def test_rounding_down_to_a_day_is_unaffected_by_a_long_day(env: Env) -> None:
     """2026-11-01 in New York is 25 hours long."""
-    assert wall(env, "trunc(2026-11-01T23:30, 1d)") == "2026-11-01T00:00:00"
+    assert date_of(env, "trunc(2026-11-01T23:30, 1d)") == "2026-11-01"
 
 
 def test_an_exact_twenty_four_hour_bucket_is_not_a_calendar_day(env: Env) -> None:
@@ -143,18 +163,30 @@ def test_an_exact_twenty_four_hour_bucket_is_not_a_calendar_day(env: Env) -> Non
     granularity and you get exact arithmetic.
     """
     assert wall(env, "trunc(2026-11-01T23:30, 24h)") == "2026-11-01T23:00:00"
-    assert wall(env, "trunc(2026-11-01T23:30, 1d)") == "2026-11-01T00:00:00"
+    assert date_of(env, "trunc(2026-11-01T23:30, 1d)") == "2026-11-01"
 
 
-def test_an_instant_already_on_a_boundary_is_unchanged(env: Env) -> None:
-    assert wall(env, "trunc(today, 1d)") == "2026-05-23T00:00:00"
-    assert wall(env, "ceil(today, 1d)") == "2026-05-23T00:00:00"
+def test_a_date_already_on_a_boundary_is_unchanged(env: Env) -> None:
+    assert date_of(env, "trunc(today, 1d)") == "2026-05-23"
+    assert date_of(env, "ceil(today, 1d)") == "2026-05-23"
 
 
-@pytest.mark.parametrize("granularity", ["1mo", "1y", "1bd"])
-def test_a_granularity_with_no_fixed_length_is_an_error(env: Env, granularity: str) -> None:
-    with pytest.raises(DtcalcError, match="nothing to round to"):
-        ev(env, f"trunc(now, {granularity})")
+def test_a_business_day_granularity_is_an_error(env: Env) -> None:
+    """It has no position within a month or a year to bucket by."""
+    with pytest.raises(DtcalcError, match="no position within"):
+        ev(env, "trunc(now, 1bd)")
+
+
+def test_an_exact_granularity_on_a_date_is_an_error(env: Env) -> None:
+    """The asymmetry: calendar granularities work on both types, exact ones
+    only on instants, because a date has no time of day to round."""
+    with pytest.raises(DtcalcError, match="no time of day to round"):
+        ev(env, "trunc(today, 1h)")
+
+
+def test_a_granularity_mixing_months_with_days_is_an_error(env: Env) -> None:
+    with pytest.raises(DtcalcError, match="one ladder"):
+        ev(env, "trunc(today, 1mo1d)")
 
 
 def test_a_zero_granularity_is_an_error(env: Env) -> None:

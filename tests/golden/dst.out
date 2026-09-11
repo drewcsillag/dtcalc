@@ -21,6 +21,6 @@ dtcalc> 2026-11-01T00:30 + 24h
 2026-11-01T23:30:00-05:00  America/New_York
 dtcalc> # Truncating to a calendar day lands on midnight even on a 25-hour day.
 dtcalc> trunc(2026-11-01T23:30, 1d)
-2026-11-01T00:00:00-04:00  America/New_York
+2026-11-01
 dtcalc> trunc(2026-11-01T23:30, 24h)
 2026-11-01T23:00:00-05:00  America/New_York

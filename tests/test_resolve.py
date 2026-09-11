@@ -137,23 +137,27 @@ def test_a_variable_may_be_reassigned_from_itself() -> None:
 # --------------------------------------------------------------------------
 
 
-def test_adding_two_instants_is_rejected_before_evaluation() -> None:
-    with pytest.raises(DtcalcError, match="cannot add two instants"):
-        resolve(parse("now + now"), EMPTY)
+def test_adding_two_points_in_time_is_rejected_before_evaluation() -> None:
+    """Wording widened now that a date is also a point in time."""
+    for source in ["now + now", "today + tomorrow", "today + now"]:
+        with pytest.raises(DtcalcError, match="cannot add two points in time"):
+            resolve(parse(source), EMPTY)
 
 
 def test_converting_a_duration_is_rejected() -> None:
-    with pytest.raises(DtcalcError, match="instant"):
+    with pytest.raises(DtcalcError, match="a date or an instant"):
         resolve(parse("5h in Tokyo"), EMPTY)
 
 
 def test_attaching_a_zone_to_a_duration_is_rejected() -> None:
-    with pytest.raises(DtcalcError, match="instant"):
+    with pytest.raises(DtcalcError, match="a date or an instant"):
         resolve(parse("5h @ Tokyo"), EMPTY)
 
 
 def test_a_forced_duration_cannot_be_converted() -> None:
-    with pytest.raises(DtcalcError, match="instant"):
+    """Caught by the operand's kind now, before the colon literal is decided,
+    so the message names the duration rather than the literal's form."""
+    with pytest.raises(DtcalcError, match="can only convert a date or an instant"):
         resolve(parse(":12:15 in Tokyo"), EMPTY)
 
 
@@ -224,3 +228,63 @@ def test_a_resolved_tree_contains_no_colon_literals() -> None:
 
     for source in ["12:15", "12:15 + foo", "foo - 12:15", "round(12:15, 1h)", "today 12:13"]:
         walk(source)
+
+
+# --------------------------------------------------------------------------
+# 3.2  inference with dates
+# --------------------------------------------------------------------------
+
+
+def test_a_bare_date_literal_is_a_date() -> None:
+    assert r("2026-12-24") == "date(2026-12-24)"
+
+
+def test_a_datetime_literal_is_still_an_instant() -> None:
+    assert r("2026-12-24T12:15") == "dt(2026-12-24T12:15)"
+
+
+@pytest.mark.parametrize(
+    "source", ["today", "tomorrow", "yesterday", "upcoming friday", "previous 15th"]
+)
+def test_the_keyword_dates_resolve_without_complaint(source: str) -> None:
+    assert r(source) == sexpr(resolve(parse(source), EMPTY))
+
+
+def test_a_colon_literal_after_a_date_resolves_to_a_duration() -> None:
+    """Unchanged from instants: subtracting from a date wants a duration."""
+    assert r("2026-12-24 - 12:15") == "(- date(2026-12-24) 12h15m)"
+
+
+def test_a_colon_literal_after_at_resolves_to_a_clock_reading() -> None:
+    assert r("2026-12-24 @ 12:00") == "(at date(2026-12-24) tod(12:00:00))"
+
+
+def test_a_date_variable_drives_the_same_inference_as_a_literal() -> None:
+    assert r("foo - 12:15", {"foo": Kind.DATE}) == "(- foo 12h15m)"
+    assert r("12:15 + foo", {"foo": Kind.DATE}) == "(+ 12h15m foo)"
+
+
+def test_a_date_may_be_converted_or_have_a_zone_attached() -> None:
+    """Reversed from the first design: a zone promotes rather than erroring."""
+    assert r("2026-12-24 in Tokyo") == "(in date(2026-12-24) Tokyo)"
+    assert r("2026-12-24 @ Tokyo") == "(@ date(2026-12-24) Tokyo)"
+
+
+@pytest.mark.parametrize(
+    ("source", "message"),
+    [("-today", "cannot negate a date"), ("-now", "cannot negate an instant")],
+)
+def test_negating_a_point_in_time_is_rejected_statically(source: str, message: str) -> None:
+    """The article is generated, because "a instant" shipped once already."""
+    with pytest.raises(DtcalcError, match=message):
+        resolve(parse(source), EMPTY)
+
+
+def test_adding_two_dates_is_rejected_statically() -> None:
+    with pytest.raises(DtcalcError, match="cannot add"):
+        resolve(parse("today + tomorrow"), EMPTY)
+
+
+def test_adding_a_date_to_an_instant_is_rejected_statically() -> None:
+    with pytest.raises(DtcalcError, match="cannot add"):
+        resolve(parse("today + now"), EMPTY)
