@@ -6,6 +6,13 @@ Notable changes to dtcalc. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `expr @ time @ zone` (and `expr @ zone @ time`) required parentheses
+  around the first `@` to parse — a second `@` was rejected as trailing
+  input. `@` now chains left-associatively, so `2026-10-27@9:57a@london`
+  works without parentheses.
+
 ## [0.2.0]
 
 Dates are now distinct from date-times, and days no longer group into weeks.

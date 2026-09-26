@@ -204,7 +204,13 @@ dtcalc> (now @ 16:00) - (now @ 12:00)
 ```
 
 The two forms of `@` never collide, because a zone name cannot begin with a
-digit: an identifier after `@` is a zone, a clock reading is a time.
+digit: an identifier after `@` is a zone, a clock reading is a time. They
+chain, left to right, so no parentheses are needed to use both:
+
+```
+dtcalc> 2026-10-27 @ 9:57a @ london
+2026-10-27T05:57:00-04:00  America/New_York
+```
 
 ## Operators
 
