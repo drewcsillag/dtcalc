@@ -427,3 +427,11 @@ def test_a_bare_meridiem_literal_is_today_at_that_time(env: Env) -> None:
 
 def test_at_a_zone_is_unaffected(env: Env) -> None:
     assert wall(env, "12:13 @ SanFrancisco") == "2026-05-23T15:13:00"
+
+
+def test_at_chains_a_time_then_a_zone_without_parens(env: Env) -> None:
+    assert ev(env, "2026-10-27@9:57a@london") == ev(env, "(2026-10-27@9:57a)@london")
+
+
+def test_at_chains_a_zone_then_a_time_without_parens(env: Env) -> None:
+    assert ev(env, "12:13 @ sf @ 4p") == ev(env, "(12:13 @ sf) @ 4p")

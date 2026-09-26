@@ -221,25 +221,28 @@ class _Parser:
 
     def _attach(self) -> Node:
         node = self._primary()
-        if not self._at(K.AT):
-            return node
+        while self._at(K.AT):
+            self._take()  # '@'
+            # A clock reading after `@` means "keep the date, use this time";
+            # an identifier means "read this wall clock as being in that
+            # zone". Either way, `@` chains: each attach applies to the
+            # result of the one before it.
+            if self._at(K.COLON_LITERAL, K.CLOCK):
+                time = self._clock_reading()
+                node = DateAtTime(node.start, time.end, node, time)
+                continue
+            if self._at(K.IDENT):
+                zone, end = self._zone_name()
+                node = Attach(node.start, end, node, zone)
+                continue
 
-        self._take()  # '@'
-        # A clock reading after `@` means "keep the date, use this time"; an
-        # identifier means "read this wall clock as being in that zone".
-        if self._at(K.COLON_LITERAL, K.CLOCK):
-            time = self._clock_reading()
-            return DateAtTime(node.start, time.end, node, time)
-        if self._at(K.IDENT):
-            zone, end = self._zone_name()
-            return Attach(node.start, end, node, zone)
-
-        found = self._current
-        where = f"but found {found.text!r}" if found is not None else "but the line ended"
-        start, end = (found.start, found.end) if found is not None else self._eof_span()
-        raise DtcalcError(
-            f"expected a timezone name or a time of day after '@' {where}", start, end
-        )
+            found = self._current
+            where = f"but found {found.text!r}" if found is not None else "but the line ended"
+            start, end = (found.start, found.end) if found is not None else self._eof_span()
+            raise DtcalcError(
+                f"expected a timezone name or a time of day after '@' {where}", start, end
+            )
+        return node
 
     def _clock_reading(self) -> Node:
         """A colon literal or a meridiem literal, as a time of day."""

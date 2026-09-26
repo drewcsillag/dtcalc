@@ -257,6 +257,19 @@ def test_a_bare_meridiem_literal_is_a_clock_reading() -> None:
     assert s("4p + 1h") == "(+ tod(16:00:00) 1h)"
 
 
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("2026-10-27 @ 9:57a @ london", "(@ (at date(2026-10-27) tod(09:57:00)) london)"),
+        ("2026-10-27@9:57a@london", "(@ (at date(2026-10-27) tod(09:57:00)) london)"),
+        ("12:13 @ sf @ 4p", "(at (@ colon(12:13) sf) tod(16:00:00))"),
+    ],
+)
+def test_at_chains_left_associatively(source: str, expected: str) -> None:
+    """A time-of-day and a zone attach in sequence, without needing parentheses."""
+    assert s(source) == expected
+
+
 def test_at_binds_tighter_than_arithmetic() -> None:
     assert s("foo @ 4p + 1h") == "(+ (at foo tod(16:00:00)) 1h)"
 
