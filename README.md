@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/drewcsillag/dtcalc/actions/workflows/ci.yml/badge.svg)](https://github.com/drewcsillag/dtcalc/actions/workflows/ci.yml)
 [![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdrewcsillag%2Fdtcalc%2Fmain%2F.github%2Fbadges%2Fcoverage.json)](https://github.com/drewcsillag/dtcalc/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/dtcalc-cli)](https://pypi.org/project/dtcalc-cli/)
 
 An interactive REPL for date, time, duration and timezone calculations.
 
@@ -26,7 +27,10 @@ Pure Python, no runtime dependencies.
 
 ```sh
 uv tool install dtcalc-cli          # or: pipx install dtcalc-cli
+pip install dtcalc-cli              # also works, e.g. inside a venv
 ```
+
+It's on PyPI as [`dtcalc-cli`](https://pypi.org/project/dtcalc-cli/).
 
 From a clone: `uv tool install .`  ·  From git:
 `uv tool install git+https://github.com/drewcsillag/dtcalc`
