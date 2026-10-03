@@ -68,3 +68,41 @@ jobs:
           test "$(uv run dtcalc 'now + 7h')" = "2026-05-23T19:15:13-04:00  America/New_York"
           test "$(uv run dtcalc '8h * 3')" = "24h"
           test "$(uv run dtcalc '2026-05-23T12:15:13 - 12:15')" = "2026-05-23T00:00:13-04:00  America/New_York"
+
+  # The browser build is a separate job so the Python matrix above stays free
+  # of Node: `make check` never needs it, and neither does a Python-only change
+  # to wait on a browser download.
+  web:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install browsers
+        # WebKit is the engine behind every iPhone browser, so it is tested
+        # alongside Chromium.
+        run: |
+          cd web
+          npm ci
+          npx playwright install --with-deps chromium webkit
+
+      - name: Build and test
+        run: make web-test
+
+      - name: Check the size budget
+        run: make web-budget

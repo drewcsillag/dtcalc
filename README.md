@@ -39,6 +39,22 @@ The distribution is named **`dtcalc-cli`** because `dtcalc` was already taken
 on PyPI by an unrelated 2021 package. The command you run, and the package you
 import, are both still `dtcalc`.
 
+## Try it in the browser
+
+dtcalc also runs in a web page, including on a phone, at
+<https://drewcsillag.github.io/dtcalc/>. It is the same Python code running
+under [Pyodide](https://pyodide.org), so answers match the command line
+exactly. Nothing is sent anywhere: your expressions are evaluated in the page.
+
+- A row of buttons (`@`, `in`, units, operators) and tappable suggestions make
+  it usable without typing every symbol. Tab completes on a keyboard.
+- History, variables and settings are remembered in your browser.
+- The first visit downloads about 7 MB; after that it works offline. On an
+  iPhone, use *Add to Home Screen* so Safari keeps it cached.
+- `?q=` prefills the input without running it, so a link can carry an
+  expression: `…/dtcalc/?q=now%20in%20Tokyo`. Run it with Enter.
+- The working zone starts as your browser's zone; `:tz` changes it.
+
 ## Running it
 
 | Command | What it does |
@@ -475,6 +491,22 @@ exercised end to end.
 CI runs `make check` on Linux and macOS. Both are worth having: Linux uses
 GNU readline and macOS ships libedit, and the REPL's prompt handling has to
 differ between them.
+
+The browser build lives in `web/` and needs Node, which nothing else does:
+
+```sh
+make web-build   # assemble web/dist: Pyodide, the wheel, tzdata, the page
+make web-test    # replay the golden transcripts through Pyodide, then run
+                 # the Playwright specs on Chromium, Pixel 7 and iPhone 14
+make web-budget  # fail if the first load is over 10 MB compressed
+```
+
+`make check` stays Python-only. The golden transcripts are the spec for the
+web build too: every one is replayed byte for byte through Pyodide. The
+`Pages` workflow builds `web/dist` and deploys it to GitHub Pages on a push to
+`main`, split into a build job and a deploy job for the same reason as the
+release workflow. Pages must be set to the *GitHub Actions* source in the
+repository settings.
 
 Releases publish to PyPI from a GitHub release via Trusted Publishing, so
 there is no API token anywhere. The version lives in `src/dtcalc/__init__.py`

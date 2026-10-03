@@ -1,4 +1,4 @@
-.PHONY: check fmt lint types test coverage coverage-check install clean web-build web-test
+.PHONY: check fmt lint types test coverage coverage-check install clean web-build web-test web-budget
 
 check: lint types test
 
@@ -54,3 +54,7 @@ web-build:
 web-test: web-build
 	cd web && npm test
 	cd web && npx playwright test
+
+# Needs web/dist from `make web-build`.
+web-budget:
+	uv run python scripts/check_web_budget.py
