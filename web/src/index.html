@@ -16,6 +16,30 @@
     <main id="scrollback" role="log" aria-live="polite" aria-label="Calculation history"></main>
     <p id="status" role="status">Loading calculator…</p>
 
+    <div id="suggestions" role="listbox" aria-label="Suggestions" hidden></div>
+    <div id="chips" aria-label="Insert">
+        <button type="button" data-insert=" @ ">@</button>
+        <button type="button" data-insert=" in ">in</button>
+        <button type="button" data-insert=":">:</button>
+        <button type="button" data-insert="ms">ms</button>
+        <button type="button" data-insert="s">s</button>
+        <button type="button" data-insert="m">m</button>
+        <button type="button" data-insert="h">h</button>
+        <button type="button" data-insert="d">d</button>
+        <button type="button" data-insert="w">w</button>
+        <button type="button" data-insert="mo">mo</button>
+        <button type="button" data-insert="y">y</button>
+        <button type="button" data-insert="bd">bd</button>
+        <button type="button" data-insert=" + ">+</button>
+        <button type="button" data-insert=" - ">-</button>
+        <button type="button" data-insert=" * ">*</button>
+        <button type="button" data-insert=" / ">/</button>
+        <button type="button" data-insert="(">(</button>
+        <button type="button" data-insert=")">)</button>
+        <button type="button" data-insert="now">now</button>
+        <button type="button" data-insert="today">today</button>
+    </div>
+
     <form id="form" autocomplete="off">
       <label for="line" class="visually-hidden">Expression</label>
       <input

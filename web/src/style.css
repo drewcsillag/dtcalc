@@ -84,11 +84,18 @@ h1 {
   overflow-wrap: anywhere;
 }
 
-/* `pre`, not `pre-wrap`: a caret under an error only lines up if the line is
-   not re-wrapped, so a wide block scrolls on its own instead. */
+/* A one-line answer wraps, so nothing is cut off on a narrow screen. */
 .output {
   margin: 0.15rem 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* A caret under an error only lines up if the block is not re-wrapped, so a
+   multi-line block keeps its layout and scrolls on its own instead. */
+.output.block {
   white-space: pre;
+  overflow-wrap: normal;
   overflow-x: auto;
 }
 
@@ -143,4 +150,43 @@ h1 {
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
+}
+
+#suggestions,
+#chips {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.4rem 1rem;
+  /* One scrolling row each, so a long list never widens the page. */
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+#suggestions[hidden] {
+  display: none;
+}
+
+#suggestions button,
+#chips button {
+  flex: none;
+  min-width: 2.5rem;
+  min-height: 2.25rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.95rem;
+}
+
+#suggestions button {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+#form {
+  border-top: 0;
 }

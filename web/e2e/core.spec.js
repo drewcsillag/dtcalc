@@ -118,3 +118,11 @@ test("long output never makes the page scroll sideways", async ({ page }) => {
   );
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test("a single-line result wraps instead of being cut off", async ({ page }) => {
+  await openCalculator(page);
+  await submit(page, "now + 7h");
+  const output = page.locator("#scrollback .entry").last().locator(".output");
+  const clipped = await output.evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(clipped).toBeLessThanOrEqual(0);
+});

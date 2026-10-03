@@ -1,11 +1,16 @@
 // The page: a terminal-like scrollback over the Pyodide engine.
 
+import { applyCompletion, insertChip, tabCompletion } from "./completion.js";
 import { loadEngine } from "./engine.js";
 
 const scrollback = document.getElementById("scrollback");
 const status = document.getElementById("status");
 const form = document.getElementById("form");
 const line = document.getElementById("line");
+const chips = document.getElementById("chips");
+const suggestions = document.getElementById("suggestions");
+
+const MAX_SUGGESTIONS = 8;
 
 const QUIT_NOTE = "Nothing to quit: this runs in your browser, so just close this tab.";
 
@@ -49,6 +54,7 @@ function addEntry(input, outcome, lines) {
 
   const output = document.createElement("pre");
   output.className = outcome === "error" ? "output error" : "output";
+  if (lines.length > 1) output.classList.add("block");
   output.textContent = lines.join("\n");
 
   entry.append(echoed, output);
@@ -56,7 +62,72 @@ function addEntry(input, outcome, lines) {
   scrollback.scrollTop = scrollback.scrollHeight;
 }
 
-function wire(session) {
+function wireEditing(session) {
+  const candidates = () => session.complete(line.value, line.selectionStart ?? line.value.length);
+
+  function refreshSuggestions() {
+    const shown = candidates().slice(0, MAX_SUGGESTIONS);
+    suggestions.replaceChildren(
+      ...shown.map((name) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = name;
+        button.dataset.complete = name;
+        return button;
+      }),
+    );
+    suggestions.hidden = shown.length === 0;
+  }
+
+  function setLine({ line: text, cursor }) {
+    line.value = text;
+    line.setSelectionRange(cursor, cursor);
+    refreshSuggestions();
+  }
+
+  // Taps must not move focus off the input, or the phone keyboard closes
+  // between every chip.
+  for (const strip of [chips, suggestions]) {
+    strip.addEventListener("pointerdown", (event) => event.preventDefault());
+  }
+
+  chips.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-insert]");
+    if (!button) return;
+    const start = line.selectionStart ?? line.value.length;
+    const end = line.selectionEnd ?? start;
+    setLine(insertChip(line.value, start, end, button.dataset.insert));
+    line.focus();
+  });
+
+  suggestions.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-complete]");
+    if (!button) return;
+    const cursor = line.selectionStart ?? line.value.length;
+    setLine(applyCompletion(line.value, cursor, button.dataset.complete));
+    line.focus();
+  });
+
+  line.addEventListener("input", refreshSuggestions);
+  line.addEventListener("click", refreshSuggestions);
+  line.addEventListener("keyup", (event) => {
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") refreshSuggestions();
+  });
+
+  line.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab" || event.shiftKey) return;
+    const cursor = line.selectionStart ?? line.value.length;
+    const result = tabCompletion(line.value, cursor, candidates());
+    // With nothing to complete, Tab keeps its normal job of moving focus on.
+    if (!result) return;
+    event.preventDefault();
+    setLine(result);
+  });
+
+  return refreshSuggestions;
+}
+
+function wire(session, refreshSuggestions) {
   const history = [];
   let position = 0;
   let draft = "";
@@ -73,6 +144,7 @@ function wire(session) {
     }
     position = history.length;
     draft = "";
+    refreshSuggestions();
   });
 
   line.addEventListener("keydown", (event) => {
@@ -80,9 +152,11 @@ function wire(session) {
       if (position === history.length) draft = line.value;
       position -= 1;
       line.value = history[position];
+      refreshSuggestions();
     } else if (event.key === "ArrowDown" && position < history.length) {
       position += 1;
       line.value = position === history.length ? draft : history[position];
+      refreshSuggestions();
     } else {
       return;
     }
@@ -92,7 +166,7 @@ function wire(session) {
 
 try {
   const session = await start();
-  wire(session);
+  wire(session, wireEditing(session));
 
   const prefill = new URLSearchParams(location.search).get("q");
   if (prefill !== null) line.value = prefill;
