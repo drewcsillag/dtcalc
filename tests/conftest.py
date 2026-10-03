@@ -10,10 +10,17 @@ from __future__ import annotations
 from zoneinfo import ZoneInfo
 
 import pytest
+from hypothesis import settings
 
 from dtcalc.clock import FixedClock
 
 from .support import NY, TEST_NOW
+
+# The properties check values, not speed. Hypothesis's default 200ms deadline
+# fails on a loaded machine (the first call loads tz data) and then reports the
+# test as flaky, which says nothing about dtcalc.
+settings.register_profile("dtcalc", deadline=None)
+settings.load_profile("dtcalc")
 
 
 @pytest.fixture

@@ -2,6 +2,7 @@
 
 import { applyCompletion, insertChip, tabCompletion } from "./completion.js";
 import { loadEngine } from "./engine.js";
+import { loadSaved, pageStorage, save } from "./storage.js";
 
 const scrollback = document.getElementById("scrollback");
 const status = document.getElementById("status");
@@ -42,6 +43,16 @@ async function start() {
     session = engine.newSession("UTC");
   }
   return session;
+}
+
+/** Put back saved variables and settings; unusable state is simply not restored. */
+function restore(session, saved) {
+  if (saved.state === null) return;
+  try {
+    session.importState(saved.state);
+  } catch {
+    // Import is all-or-nothing, so the fresh session is untouched.
+  }
 }
 
 function addEntry(input, outcome, lines) {
@@ -127,9 +138,9 @@ function wireEditing(session) {
   return refreshSuggestions;
 }
 
-function wire(session, refreshSuggestions) {
-  const history = [];
-  let position = 0;
+function wire(session, refreshSuggestions, saved, storage) {
+  const history = [...saved.history];
+  let position = history.length;
   let draft = "";
 
   form.addEventListener("submit", (event) => {
@@ -141,6 +152,7 @@ function wire(session, refreshSuggestions) {
     if (outcome !== "nothing") {
       addEntry(text, outcome, outcome === "quit" ? [QUIT_NOTE] : lines);
       if (history.at(-1) !== text) history.push(text);
+      save(storage, { history, state: session.exportState() });
     }
     position = history.length;
     draft = "";
@@ -166,7 +178,10 @@ function wire(session, refreshSuggestions) {
 
 try {
   const session = await start();
-  wire(session, wireEditing(session));
+  const storage = pageStorage();
+  const saved = loadSaved(storage);
+  restore(session, saved);
+  wire(session, wireEditing(session), saved, storage);
 
   const prefill = new URLSearchParams(location.search).get("q");
   if (prefill !== null) line.value = prefill;
