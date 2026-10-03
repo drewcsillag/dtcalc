@@ -176,6 +176,11 @@ function wire(session, refreshSuggestions, saved, storage) {
   });
 }
 
+function registerOfflineSupport() {
+  // Best effort: without a worker the calculator just needs the network.
+  navigator.serviceWorker?.register("sw.js").catch(() => {});
+}
+
 try {
   const session = await start();
   const storage = pageStorage();
@@ -189,6 +194,7 @@ try {
   status.hidden = true;
   line.disabled = false;
   line.focus();
+  registerOfflineSupport();
 } catch (error) {
   status.textContent = `Could not start the calculator: ${error.message}`;
 }

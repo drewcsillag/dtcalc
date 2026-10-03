@@ -1,5 +1,10 @@
 // A minimal static server for web/dist, so e2e tests need no extra dependency.
 // Serves .wasm with the right type and honours nothing else: no caching headers.
+//
+// A request carrying the cookie `offline=1` gets its connection dropped. That
+// is how the offline spec cuts the network for one browser context only, and
+// it works the same in every engine (WebKit's own offline switch fails even
+// navigations a service worker could answer).
 
 import fs from "node:fs";
 import http from "node:http";
@@ -18,12 +23,17 @@ const TYPES = {
   ".wasm": "application/wasm",
   ".whl": "application/octet-stream",
   ".zip": "application/zip",
+  ".webmanifest": "application/manifest+json",
   ".png": "image/png",
   ".svg": "image/svg+xml",
 };
 
 http
   .createServer((req, res) => {
+    if (/(^|;\s*)offline=1(;|$)/.test(req.headers.cookie ?? "")) {
+      req.destroy();
+      return;
+    }
     const url = new URL(req.url, "http://localhost");
     let file = path.join(DIST, decodeURIComponent(url.pathname));
     if (!file.startsWith(DIST)) {

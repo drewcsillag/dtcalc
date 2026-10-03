@@ -13,3 +13,8 @@ export async function submit(page, text) {
   await page.locator("#line").fill(text);
   await page.locator("#line").press("Enter");
 }
+
+/** Cut this context off from the server; anything not already cached now fails. */
+export async function goOffline(context) {
+  await context.addCookies([{ name: "offline", value: "1", url: "http://127.0.0.1:4173" }]);
+}

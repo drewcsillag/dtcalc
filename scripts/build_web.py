@@ -21,7 +21,7 @@ import urllib.request
 from pathlib import Path
 from typing import Final
 
-__all__ = ["build", "verified"]
+__all__ = ["build", "content_version", "precache_files", "stamp_service_worker", "verified"]
 
 ROOT: Final = Path(__file__).resolve().parent.parent
 WEB: Final = ROOT / "web"
@@ -86,10 +86,44 @@ def _copy_pyodide(into: Path) -> None:
 
 
 def _copy_site(into: Path) -> None:
-    """Copy the hand-written page, script and styles next to the generated files."""
-    for source in sorted((WEB / "src").iterdir()):
-        if source.is_file():
-            shutil.copy2(source, into / source.name)
+    """Copy the hand-written page, scripts, styles and icons next to the generated files."""
+    shutil.copytree(WEB / "src", into, dirs_exist_ok=True)
+
+
+SERVICE_WORKER: Final = "sw.js"
+
+
+def precache_files(root: Path) -> list[str]:
+    """Every file under ``root`` the offline copy needs, as sorted relative URLs."""
+    return sorted(
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file() and path.name != SERVICE_WORKER and not path.name.startswith(".")
+    )
+
+
+def content_version(root: Path, files: list[str]) -> str:
+    """A short hash of the names and contents, so any change yields a new version."""
+    digest = hashlib.sha256()
+    for name in files:
+        digest.update(name.encode())
+        digest.update(b"\0")
+        digest.update((root / name).read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()[:16]
+
+
+def stamp_service_worker(template: str, files: list[str], version: str) -> str:
+    """Fill the worker's version and file list; refuse a template that lacks the slots."""
+    if "__VERSION__" not in template or "__FILES__" not in template:
+        raise SystemExit("the service worker template is missing its placeholder")
+    return template.replace("__VERSION__", version).replace("__FILES__", json.dumps(files))
+
+
+def _stamp(root: Path) -> None:
+    worker = root / SERVICE_WORKER
+    files = precache_files(root)
+    worker.write_text(stamp_service_worker(worker.read_text(), files, content_version(root, files)))
 
 
 def build() -> None:
@@ -106,6 +140,9 @@ def build() -> None:
     # The order is the install order; the manifest is what the page and the
     # service worker both read, so neither hard-codes a version.
     (DIST / "wheels.json").write_text(json.dumps([TZDATA_FILE, dtcalc_wheel.name]) + "\n")
+
+    # Last, so the precache list covers every file above.
+    _stamp(DIST)
 
 
 if __name__ == "__main__":
