@@ -6,6 +6,15 @@ Notable changes to dtcalc. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A browser version**, built from this same code with Pyodide and hosted on
+  GitHub Pages. It has a terminal-style scrollback, tap-to-insert chips and
+  suggestions for phones, Tab completion, history, saved variables and
+  settings, `?q=` links, and offline use as an installable web app. The Python
+  package gains `dtcalc.web`, a terminal-free facade the page drives; the
+  command line is unchanged.
+
 ## [0.3.0]
 
 ### Fixed

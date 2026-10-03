@@ -1,4 +1,4 @@
-.PHONY: check fmt lint types test coverage coverage-check install clean
+.PHONY: check fmt lint types test coverage coverage-check install clean web-build web-test web-budget
 
 check: lint types test
 
@@ -45,3 +45,16 @@ clean:
 	rm -rf .mypy_cache .pytest_cache .ruff_cache dist build coverage.json
 	rm -f .coverage .coverage.*
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +
+
+# Node tooling stays behind these targets, so `make check` needs no Node.
+web-build:
+	cd web && npm ci
+	uv run python scripts/build_web.py
+
+web-test: web-build
+	cd web && npm test
+	cd web && npx playwright test
+
+# Needs web/dist from `make web-build`.
+web-budget:
+	uv run python scripts/check_web_budget.py

@@ -1,0 +1,16 @@
+{
+  "name": "dtcalc-web",
+  "private": true,
+  "type": "module",
+  "description": "Browser build of dtcalc, running the Python engine under Pyodide",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "pyodide": "314.0.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
+}
