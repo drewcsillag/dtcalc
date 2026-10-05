@@ -13,7 +13,7 @@ import pytest
 from dtcalc.ast import sexpr
 from dtcalc.errors import DtcalcError
 from dtcalc.parser import parse
-from dtcalc.resolve import Kind, resolve
+from dtcalc.resolve import AmbiguousColonError, Kind, resolve
 
 EMPTY: dict[str, Kind] = {}
 
@@ -288,3 +288,79 @@ def test_adding_two_dates_is_rejected_statically() -> None:
 def test_adding_a_date_to_an_instant_is_rejected_statically() -> None:
     with pytest.raises(DtcalcError, match="cannot add"):
         resolve(parse("today + now"), EMPTY)
+
+
+# --------------------------------------------------------------------------
+# two bare colon literals: both readings typecheck, so the user must choose
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("source", ["2:11 - 1:29", "2:11 + 1:29", "foo = 2:11 - 1:29"])
+def test_two_bare_colon_literals_are_ambiguous(source: str) -> None:
+    with pytest.raises(AmbiguousColonError):
+        resolve(parse(source), EMPTY)
+
+
+def test_the_ambiguity_names_the_span_and_both_spellings() -> None:
+    with pytest.raises(AmbiguousColonError) as excinfo:
+        resolve(parse("x = 2:11 - 1:29"), EMPTY)
+    error = excinfo.value
+    assert (error.start, error.end) == (4, 15)
+    assert error.clock_spelling == "2:11 - 1:29h"
+    assert error.duration_spelling == "2:11h - 1:29"
+
+
+def test_the_ambiguity_message_explains_both_readings() -> None:
+    source = "2:11 - 1:29"
+    with pytest.raises(AmbiguousColonError) as excinfo:
+        resolve(parse(source), EMPTY)
+    rendered = excinfo.value.render(source)
+    assert "ambiguous" in rendered
+    assert "^^^^^^^^^^^" in rendered
+    assert "2:11 - 1:29h" in rendered
+    assert "2:11h - 1:29" in rendered
+    assert "2h11m - 1h29m" in rendered
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "2:11h - 1:29",  # forced duration on the left
+        "2:11 - 1:29h",  # forced duration on the right
+        ":2:11 - 1:29",
+        "now - 1:29",
+        "12:15 + 3h",  # documented: the clock reading wins
+        "12:15 - 3h",
+        "2:11 - 1:29 * 2",  # the right side is a product, so it is a duration
+        "2026-05-23T12:15:13 - 12:15",
+        "2:11 < 1:29",  # comparisons stay as they are
+    ],
+)
+def test_only_two_bare_colon_literals_are_ambiguous(source: str) -> None:
+    resolve(parse(source), EMPTY)
+
+
+def test_a_variable_removes_the_ambiguity() -> None:
+    assert r("2:11 - foo", {"foo": Kind.DURATION}) == "(- tod(02:11:00) foo)"
+
+
+def test_a_clock_choice_reads_the_left_as_a_time_of_day() -> None:
+    tree = resolve(parse("2:11 - 1:29"), EMPTY, {(0, 11): "clock"})
+    assert sexpr(tree) == "(- tod(02:11:00) 1h29m)"
+
+
+def test_a_duration_choice_reads_both_as_durations() -> None:
+    tree = resolve(parse("2:11 - 1:29"), EMPTY, {(0, 11): "duration"})
+    assert sexpr(tree) == "(- 2h11m 1h29m)"
+    tree = resolve(parse("2:11 + 1:29"), EMPTY, {(0, 11): "duration"})
+    assert sexpr(tree) == "(+ 2h11m 1h29m)"
+
+
+def test_each_ambiguity_in_a_line_needs_its_own_choice() -> None:
+    source = "max(2:11 - 1:29, 3:00 - 1:00)"
+    with pytest.raises(AmbiguousColonError) as first:
+        resolve(parse(source), EMPTY)
+    key = first.value.span
+    with pytest.raises(AmbiguousColonError) as second:
+        resolve(parse(source), EMPTY, {key: "duration"})
+    assert second.value.span != key

@@ -187,3 +187,85 @@ def test_vars_shows_the_kind_column(repl: Any) -> None:
     repl.sendline(":vars")
     repl.expect_exact("birthday")
     repl.expect_exact("date")
+
+
+# --------------------------------------------------------------------------
+# ambiguous colon readings
+# --------------------------------------------------------------------------
+
+CHOOSE = "which reading? [1/2, Enter to cancel] "
+
+
+def leave(repl: Any) -> None:
+    """Quit cleanly, so the child flushes its coverage data on the way out."""
+    repl.sendline(":q")
+    repl.expect(pexpect.EOF)
+
+
+def test_an_ambiguous_line_asks_which_reading_is_meant(repl: Any) -> None:
+    repl.sendline("2:11 - 1:29")
+    repl.expect_exact("1) a time of day and a duration")
+    repl.expect_exact("2) two durations")
+    repl.expect_exact(CHOOSE)
+    repl.sendline("")
+    repl.expect_exact(PROMPT)
+    leave(repl)
+
+
+def test_choosing_the_clock_reading_evaluates_it(repl: Any) -> None:
+    repl.sendline("2:11 - 1:29")
+    repl.expect_exact(CHOOSE)
+    repl.sendline("1")
+    repl.expect_exact("2026-05-23T00:42:00")
+    repl.expect_exact(PROMPT)
+    leave(repl)
+
+
+def test_choosing_the_duration_reading_evaluates_it(repl: Any) -> None:
+    repl.sendline("2:11 - 1:29")
+    repl.expect_exact(CHOOSE)
+    repl.sendline("2")
+    repl.expect_exact("42m")
+    repl.expect_exact(PROMPT)
+    leave(repl)
+
+
+def test_an_empty_answer_cancels(repl: Any) -> None:
+    repl.sendline("2:11 - 1:29")
+    repl.expect_exact(CHOOSE)
+    repl.sendline("")
+    repl.expect_exact(PROMPT)
+    repl.sendline("1h + 1h")
+    repl.expect_exact("2h")
+    leave(repl)
+
+
+def test_an_unrecognised_answer_asks_again(repl: Any) -> None:
+    repl.sendline("2:11 - 1:29")
+    repl.expect_exact(CHOOSE)
+    repl.sendline("x")
+    repl.expect_exact(CHOOSE)
+    repl.sendline("2")
+    repl.expect_exact("42m")
+    leave(repl)
+
+
+def test_ctrl_c_cancels_the_question(repl: Any) -> None:
+    repl.sendline("2:11 - 1:29")
+    repl.expect_exact(CHOOSE)
+    repl.sendintr()
+    repl.expect_exact(PROMPT)
+    repl.sendline("1h + 1h")
+    repl.expect_exact("2h")
+    leave(repl)
+
+
+def test_each_ambiguity_in_a_line_is_asked_in_turn(repl: Any) -> None:
+    repl.sendline("max(2:11 - 1:29, 3:00 - 1:00)")
+    repl.expect_exact(CHOOSE)
+    repl.sendline("2")
+    repl.expect_exact(CHOOSE)
+    repl.sendline("2")
+    repl.expect_exact("2h")
+    repl.expect_exact(PROMPT)
+    leave(repl)

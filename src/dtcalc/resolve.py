@@ -14,6 +14,12 @@ Two rules do the work:
   past noon plus three hours, on the grounds that a duration is more naturally
   written ``12h15m`` anyway.
 
+One case is too close to call and is refused instead: ``2:11 - 1:29`` with two
+bare colon literals might be a time of day less a duration or two durations.
+:class:`AmbiguousColonError` asks the user to say which, either by rewriting
+the line or, in a front end that can ask, by supplying a *choice* for that
+operator's span.
+
 It needs the variable environment, because ``12:15 + foo`` depends on what
 ``foo`` is.  Variables are eager, so that is always known by evaluation time.
 This is also where the type errors that can be proved without running
@@ -23,7 +29,7 @@ anything are raised.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Final
+from typing import Final, Literal
 
 from dtcalc.ast import (
     Assign,
@@ -50,7 +56,7 @@ from dtcalc.duration import Duration
 from dtcalc.errors import DtcalcError
 from dtcalc.lexer import ColonLiteral
 
-__all__ = ["Expect", "Kind", "resolve"]
+__all__ = ["AmbiguousColonError", "Choice", "Choices", "Expect", "Kind", "resolve"]
 
 # Units in descending order, so a literal's leading unit picks a slice.
 _UNIT_ORDER: Final[tuple[str, ...]] = ("h", "m", "s")
@@ -61,10 +67,58 @@ _MAX_SECOND: Final = 60  # exclusive; leap seconds are not represented
 
 type Types = Mapping[str, Kind]
 
+# How to read an ambiguous `colon op colon`: a time of day and a duration, or
+# two durations.
+type Choice = Literal["clock", "duration"]
 
-def resolve(node: Node, types: Types) -> Node:
-    """Return an equivalent tree with every colon literal decided."""
-    return _resolve(node, Expect.EITHER, types)
+# A choice per ambiguous operator, keyed by that operator's span in the source.
+type Choices = Mapping[tuple[int, int], Choice]
+
+
+class AmbiguousColonError(DtcalcError):
+    """Two bare colon literals around ``+`` or ``-``, which read either way.
+
+    Carries both explicit spellings so a front end can offer them, and the
+    operator's span, which is the key under which a choice is supplied.
+    """
+
+    def __init__(self, node: Binary, left: ColonLit, right: ColonLit) -> None:
+        self.clock_spelling = f"{left.text} {node.op} {right.text}h"
+        self.duration_spelling = f"{left.text}h {node.op} {right.text}"
+        self.op = node.op
+        self.left_duration = str(_as_duration(left.literal))
+        self.right_duration = str(_as_duration(right.literal))
+        operation = "plus" if node.op == "+" else "less"
+        super().__init__(
+            f"{left.text} {node.op} {right.text} is ambiguous: a time of day {operation} "
+            "a duration, or two durations",
+            node.start,
+            node.end,
+        )
+
+    @property
+    def span(self) -> tuple[int, int]:
+        assert self.start is not None and self.end is not None
+        return self.start, self.end
+
+    def render(self, line: str) -> str:
+        return "\n".join(
+            [
+                super().render(line),
+                f"  as a time of day and a duration: {self.clock_spelling}",
+                f"  as two durations ({self.left_duration} {self.op} {self.right_duration}): "
+                f"{self.duration_spelling}",
+            ]
+        )
+
+
+def resolve(node: Node, types: Types, choices: Choices | None = None) -> Node:
+    """Return an equivalent tree with every colon literal decided.
+
+    ``choices`` settles ambiguous operators that would otherwise raise
+    :class:`AmbiguousColonError`.
+    """
+    return _resolve(node, Expect.EITHER, types, choices or {})
 
 
 # --------------------------------------------------------------------------
@@ -157,7 +211,7 @@ def _lookup(node: Node, name: str, types: Types) -> Kind:
 # --------------------------------------------------------------------------
 
 
-def _resolve(node: Node, expect: Expect, types: Types) -> Node:
+def _resolve(node: Node, expect: Expect, types: Types, choices: Choices) -> Node:
     match node:
         case ColonLit():
             return _decide(node, expect)
@@ -179,8 +233,8 @@ def _resolve(node: Node, expect: Expect, types: Types) -> Node:
             return DateAtTime(
                 node.start,
                 node.end,
-                _require_moment(date, "take the date from", types),
-                _resolve(time, Expect.INSTANT, types),
+                _require_moment(date, "take the date from", types, choices),
+                _resolve(time, Expect.INSTANT, types, choices),
             )
 
         case Assign(name=name, value=value):
@@ -190,32 +244,37 @@ def _resolve(node: Node, expect: Expect, types: Types) -> Node:
                     node.start,
                     node.end,
                 )
-            return Assign(node.start, node.end, name, _resolve(value, expect, types))
+            return Assign(node.start, node.end, name, _resolve(value, expect, types, choices))
 
         case Negate(operand=operand):
             if (kind := _infer(operand, types)) in _MOMENTS:
                 raise DtcalcError(f"cannot negate {_article(kind)}", node.start, node.end)
-            return Negate(node.start, node.end, _resolve(operand, Expect.DURATION, types))
+            return Negate(node.start, node.end, _resolve(operand, Expect.DURATION, types, choices))
 
         case Convert(operand=operand, zone_name=zone):
-            return Convert(node.start, node.end, _require_moment(operand, "convert", types), zone)
+            return Convert(
+                node.start, node.end, _require_moment(operand, "convert", types, choices), zone
+            )
 
         case Attach(operand=operand, zone_name=zone):
             return Attach(
-                node.start, node.end, _require_moment(operand, "attach a zone to", types), zone
+                node.start,
+                node.end,
+                _require_moment(operand, "attach a zone to", types, choices),
+                zone,
             )
 
         case Binary(op=op, left=left, right=right):
-            return _resolve_binary(node, op, left, right, types)
+            return _resolve_binary(node, op, left, right, expect, types, choices)
 
         case Call(name=name, args=args):
-            return _resolve_call(node, name, args, types)
+            return _resolve_call(node, name, args, types, choices)
 
         case _:  # pragma: no cover - every node type is covered above
             raise AssertionError(f"unhandled node {node!r}")
 
 
-def _require_moment(operand: Node, verb: str, types: Types) -> Node:
+def _require_moment(operand: Node, verb: str, types: Types, choices: Choices) -> Node:
     """Require a date or an instant — both denote a point on the calendar."""
     kind = _infer(operand, types)
     if kind is not None and kind not in _MOMENTS:
@@ -224,10 +283,14 @@ def _require_moment(operand: Node, verb: str, types: Types) -> Node:
             operand.start,
             operand.end,
         )
-    return _resolve(operand, Expect.MOMENT, types)
+    return _resolve(operand, Expect.MOMENT, types, choices)
 
 
-def _resolve_binary(node: Node, op: str, left: Node, right: Node, types: Types) -> Node:
+def _resolve_binary(
+    node: Node, op: str, left: Node, right: Node, expect: Expect, types: Types, choices: Choices
+) -> Node:
+    if expect is Expect.EITHER and _is_ambiguous(op, left, right):
+        return _resolve_ambiguous(node, op, left, right, choices)
     left_kind = _infer(left, types)
     right_kind = _infer(right, types)
     left_expect, right_expect = _operand_expectations(node, op, left_kind, right_kind)
@@ -235,8 +298,40 @@ def _resolve_binary(node: Node, op: str, left: Node, right: Node, types: Types) 
         node.start,
         node.end,
         op,
-        _resolve(left, left_expect, types),
-        _resolve(right, right_expect, types),
+        _resolve(left, left_expect, types, choices),
+        _resolve(right, right_expect, types, choices),
+    )
+
+
+def _is_ambiguous(op: str, left: Node, right: Node) -> bool:
+    """Two bare colon literals around ``+``/``-`` where either reading is valid."""
+    if op not in {"+", "-"}:
+        return False
+    if not (isinstance(left, ColonLit) and isinstance(right, ColonLit)):
+        return False
+    if left.literal.forced_duration or right.literal.forced_duration:
+        return False
+    try:
+        _as_time_of_day(left)
+    except DtcalcError:
+        # Only the duration reading exists, so there is nothing to ask.
+        return False
+    return True
+
+
+def _resolve_ambiguous(node: Node, op: str, left: Node, right: Node, choices: Choices) -> Node:
+    assert isinstance(node, Binary)
+    assert isinstance(left, ColonLit) and isinstance(right, ColonLit)
+    choice = choices.get((node.start, node.end))
+    if choice is None:
+        raise AmbiguousColonError(node, left, right)
+    left_expect = Expect.INSTANT if choice == "clock" else Expect.DURATION
+    return Binary(
+        node.start,
+        node.end,
+        op,
+        _decide(left, left_expect),
+        _decide(right, Expect.DURATION),
     )
 
 
@@ -284,7 +379,9 @@ def _operand_expectations(
     return Expect.EITHER, Expect.EITHER
 
 
-def _resolve_call(node: Node, name: str, args: tuple[Node, ...], types: Types) -> Node:
+def _resolve_call(
+    node: Node, name: str, args: tuple[Node, ...], types: Types, choices: Choices
+) -> Node:
     signature = SIGNATURES.get(name)
     if signature is None:
         known = ", ".join(sorted(SIGNATURES))
@@ -304,7 +401,8 @@ def _resolve_call(node: Node, name: str, args: tuple[Node, ...], types: Types) -
         )
 
     resolved = tuple(
-        _resolve(arg, signature.expectation(position), types) for position, arg in enumerate(args)
+        _resolve(arg, signature.expectation(position), types, choices)
+        for position, arg in enumerate(args)
     )
     return Call(node.start, node.end, name, resolved)
 

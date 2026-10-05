@@ -43,3 +43,18 @@ test("an unknown zone is rejected", () => {
 test("zoneNames lists the zones", () => {
   assert.ok(engine.zoneNames().includes("America/New_York"));
 });
+
+test("runLine reports an ambiguity and takes the answers to it", async () => {
+  const session = await engine.fresh();
+  const first = session.runLine("2:11 - 1:29");
+  assert.equal(first.outcome, "error");
+  assert.deepEqual(first.ambiguity.options.map((option) => option.choice), ["clock", "duration"]);
+
+  const settled = session.runLine("2:11 - 1:29", [[...first.ambiguity.key, "duration"]]);
+  assert.deepEqual(settled, { outcome: "ok", lines: ["42m"], ambiguity: null });
+});
+
+test("runLine on an ordinary line has no ambiguity", async () => {
+  const session = await engine.fresh();
+  assert.deepEqual(session.runLine("1h + 1h"), { outcome: "ok", lines: ["2h"], ambiguity: null });
+});

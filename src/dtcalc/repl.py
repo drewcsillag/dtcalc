@@ -18,7 +18,8 @@ from typing import Final
 from dtcalc.builtins import SIGNATURES
 from dtcalc.env import Env
 from dtcalc.format import FORMATS, PLAIN, Style
-from dtcalc.session import Outcome, execute_line
+from dtcalc.resolve import Choice, Choices
+from dtcalc.session import Ambiguity, Outcome, Result, execute_line
 from dtcalc.zones import CURATED_ALIASES, all_zone_names
 
 __all__ = ["completions", "readline_prompt", "run_repl"]
@@ -171,13 +172,53 @@ def run_repl(env: Env, style: Style = PLAIN) -> int:
                 print("^C")
                 continue
 
-            result = execute_line(line, env, style)
+            result = _execute_asking(line, env, style)
+            if result is None:
+                continue
             if result.outcome is Outcome.QUIT:
                 return 0
             for text in result.lines:
                 print(text)
     finally:
         _save_history(readline)
+
+
+CHOOSE_PROMPT: Final = "which reading? [1/2, Enter to cancel] "
+
+
+def _execute_asking(line: str, env: Env, style: Style) -> Result | None:
+    """Run a line, asking which reading is meant for each ambiguity.
+
+    Every answer is remembered and the line re-run, so a line with several
+    ambiguities is settled one question at a time.  ``None`` means the user
+    cancelled and there is nothing to print.
+    """
+    choices: Choices = {}
+    while True:
+        result = execute_line(line, env, style, choices)
+        if result.ambiguity is None:
+            return result
+        answer = _ask(result.ambiguity)
+        if answer is None:
+            return None
+        choices = {**choices, result.ambiguity.key: answer}
+
+
+def _ask(ambiguity: Ambiguity) -> Choice | None:
+    print("ambiguous: which did you mean?")
+    for number, option in enumerate(ambiguity.options, start=1):
+        preview = f"  =>  {option.preview}" if option.preview else ""
+        print(f"  {number}) {option.label}: {option.spelling}{preview}")
+    while True:
+        try:
+            reply = input(CHOOSE_PROMPT).strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return None
+        if not reply:
+            return None
+        if reply.isdigit() and 1 <= int(reply) <= len(ambiguity.options):
+            return ambiguity.options[int(reply) - 1].choice
 
 
 def _setup_readline(env: Env) -> object:

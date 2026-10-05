@@ -41,7 +41,8 @@ clock times 12:15 or 16:00, and 4p 4a 4pm 4:30pm (12a is midnight,
             12p is noon)
 durations   3w2h5m, 250ms, 1.5s, 3bd  (ms s m h | d w | mo y | bd)
 colon forms 12:15 is 12h15m or 12:15:00 depending on context;
-            12:15m is 12m15s, :12:15 is 12m15s, ::15 is 15s
+            12:15m is 12m15s, :12:15 is 12m15s, ::15 is 15s;
+            2:11 - 1:29 is ambiguous, so say 2:11h - 1:29 or 2:11 - 1:29h
 operators   + - * / %, comparisons, in (show in a zone)
             @ attaches a zone (12:13 @ sf) or a time (foo @ 4p, which
             keeps foo's date and changes the time)

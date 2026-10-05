@@ -51,6 +51,8 @@ exactly. Nothing is sent anywhere: your expressions are evaluated in the page.
 - ↑ and ↓ buttons at the start of that row step through earlier expressions
   (the arrow keys do the same on a keyboard), and tapping an expression in the
   scrollback copies it back into the input to edit and rerun.
+- An ambiguous line such as `2:11 - 1:29` shows both readings as buttons to
+  tap, with the answer each would give.
 - History, variables and settings are remembered in your browser.
 - The first visit downloads about 7 MB; after that it works offline. On an
   iPhone, use *Add to Home Screen* so Safari keeps it cached.
@@ -168,6 +170,25 @@ grounds that a duration is more naturally written `12h15m` anyway:
 dtcalc> 12:15 + 3h
 2026-05-23T15:15:00-04:00  America/New_York
 ```
+
+The one exception is two bare colon literals joined by `+` or `-`, such as
+`2:11 - 1:29`. That is either a time of day less a duration (00:42 today) or
+two durations (`42m`), and neither is a safe guess, so dtcalc asks. At the
+interactive prompt you pick a reading and the line is run; a line with several
+such spots asks about each in turn, and Enter or Ctrl-C cancels:
+
+```
+dtcalc> 2:11 - 1:29
+ambiguous: which did you mean?
+  1) a time of day and a duration: 2:11 - 1:29h  =>  2026-05-23T00:42:00-04:00  America/New_York
+  2) two durations (2h11m - 1h29m): 2:11h - 1:29  =>  42m
+which reading? [1/2, Enter to cancel] 2
+42m
+```
+
+When there is nobody to ask (a pipe, or an expression given on the command
+line) it is an error that names both spellings, so you can rerun with the one
+you meant. In the browser the same question appears as two buttons.
 
 Two explicit forms force a duration. A trailing `h` or `m` names the unit of
 the **leftmost** field; a leading colon shifts the units down one place:
