@@ -48,6 +48,9 @@ exactly. Nothing is sent anywhere: your expressions are evaluated in the page.
 
 - A row of buttons (`@`, `in`, units, operators) and tappable suggestions make
   it usable without typing every symbol. Tab completes on a keyboard.
+- ↑ and ↓ buttons at the start of that row step through earlier expressions
+  (the arrow keys do the same on a keyboard), and tapping an expression in the
+  scrollback copies it back into the input to edit and rerun.
 - History, variables and settings are remembered in your browser.
 - The first visit downloads about 7 MB; after that it works offline. On an
   iPhone, use *Add to Home Screen* so Safari keeps it cached.
