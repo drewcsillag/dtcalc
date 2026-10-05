@@ -14,6 +14,9 @@ Notable changes to dtcalc. The format follows
   settings, `?q=` links, and offline use as an installable web app. The Python
   package gains `dtcalc.web`, a terminal-free facade the page drives; the
   command line is unchanged.
+- In the browser version, ↑/↓ buttons recall earlier expressions on a phone,
+  where there are no arrow keys, and tapping an expression in the scrollback
+  copies it back into the input.
 
 ## [0.3.0]
 

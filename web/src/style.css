@@ -82,6 +82,17 @@ h1 {
 .input {
   color: var(--muted);
   overflow-wrap: anywhere;
+  /* Tapping it recalls the expression. */
+  cursor: pointer;
+}
+
+.input:hover {
+  color: var(--fg);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* A one-line answer wraps, so nothing is cut off on a narrow screen. */
@@ -180,6 +191,11 @@ h1 {
   color: var(--fg);
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.95rem;
+}
+
+/* The two history buttons sit apart from the symbols after them. */
+#chips button[data-history="down"] {
+  margin-right: 0.4rem;
 }
 
 #suggestions button {

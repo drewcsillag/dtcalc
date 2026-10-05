@@ -62,6 +62,9 @@ function addEntry(input, outcome, lines) {
   const echoed = document.createElement("div");
   echoed.className = "input";
   echoed.textContent = input;
+  // Tapping it copies it back into the input; see wireRecall.
+  echoed.setAttribute("role", "button");
+  echoed.tabIndex = 0;
 
   const output = document.createElement("pre");
   output.className = outcome === "error" ? "output error" : "output";
@@ -159,20 +162,60 @@ function wire(session, refreshSuggestions, saved, storage) {
     refreshSuggestions();
   });
 
+  // Arrow keys and the on-screen buttons share these, so they cannot drift.
+  function older() {
+    if (position === 0) return;
+    if (position === history.length) draft = line.value;
+    position -= 1;
+    show(history[position]);
+  }
+
+  function newer() {
+    if (position === history.length) return;
+    position += 1;
+    show(position === history.length ? draft : history[position]);
+  }
+
+  function show(text) {
+    line.value = text;
+    line.setSelectionRange(text.length, text.length);
+    refreshSuggestions();
+  }
+
   line.addEventListener("keydown", (event) => {
-    if (event.key === "ArrowUp" && position > 0) {
-      if (position === history.length) draft = line.value;
-      position -= 1;
-      line.value = history[position];
-      refreshSuggestions();
-    } else if (event.key === "ArrowDown" && position < history.length) {
-      position += 1;
-      line.value = position === history.length ? draft : history[position];
-      refreshSuggestions();
-    } else {
-      return;
-    }
+    if (event.key === "ArrowUp" && position > 0) older();
+    else if (event.key === "ArrowDown" && position < history.length) newer();
+    else return;
     event.preventDefault();
+  });
+
+  chips.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-history]");
+    if (!button) return;
+    if (button.dataset.history === "up") older();
+    else newer();
+    line.focus();
+  });
+
+  return show;
+}
+
+/** Tapping an earlier expression in the scrollback puts it back in the input. */
+function wireRecall(show) {
+  const recall = (target) => {
+    const echoed = target.closest(".input");
+    if (!echoed) return;
+    // Finishing a drag-select also clicks; that should leave the input alone.
+    if (window.getSelection()?.toString()) return;
+    show(echoed.textContent);
+    line.focus();
+  };
+  scrollback.addEventListener("click", (event) => recall(event.target));
+  scrollback.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      recall(event.target);
+    }
   });
 }
 
@@ -186,7 +229,7 @@ try {
   const storage = pageStorage();
   const saved = loadSaved(storage);
   restore(session, saved);
-  wire(session, wireEditing(session), saved, storage);
+  wireRecall(wire(session, wireEditing(session), saved, storage));
 
   const prefill = new URLSearchParams(location.search).get("q");
   if (prefill !== null) line.value = prefill;
