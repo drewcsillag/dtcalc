@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from dataclasses import asdict
 from datetime import UTC, datetime
 from typing import Any, Final, assert_never
 from zoneinfo import ZoneInfo
@@ -27,6 +28,7 @@ from dtcalc.errors import DtcalcError
 from dtcalc.format import CLOCKS, FORMATS, PLAIN
 from dtcalc.instant import Instant
 from dtcalc.repl import completions
+from dtcalc.resolve import Choice, Choices
 from dtcalc.session import execute_line
 from dtcalc.values import Boolean, Number, Value
 from dtcalc.zones import all_zone_names, resolve_zone
@@ -60,6 +62,31 @@ class WebSession:
         result = execute_line(line, self._env, PLAIN)
         lines = [part for block in result.lines for part in block.split("\n")]
         return result.outcome.name.lower(), lines
+
+    def run_line(self, line: str, choices: str = "[]") -> str:
+        """Like :meth:`run`, but able to ask which reading an ambiguous line means.
+
+        ``choices`` is a JSON list of ``[start, end, "clock" | "duration"]``
+        answers given so far; the reply is a JSON object with ``outcome``,
+        ``lines`` and ``ambiguity``.  The last is ``null`` unless the line has
+        a further unanswered ambiguity, in which case it holds the operator's
+        ``key`` and the ``options`` to put to the user.  JSON both ways keeps
+        the JavaScript free of Pyodide proxies.
+        """
+        result = execute_line(line, self._env, PLAIN, _parse_choices(choices))
+        ambiguity = result.ambiguity
+        return json.dumps(
+            {
+                "outcome": result.outcome.name.lower(),
+                "lines": [part for block in result.lines for part in block.split("\n")],
+                "ambiguity": None
+                if ambiguity is None
+                else {
+                    "key": list(ambiguity.key),
+                    "options": [asdict(option) for option in ambiguity.options],
+                },
+            }
+        )
 
     def complete(self, line: str, cursor: int) -> list[str]:
         return completions(line, cursor, self._env)
@@ -113,6 +140,22 @@ class WebSession:
         env = self._env
         env.zone, env.fmt, env.clock_style, env.group_weeks = zone, fmt, clock, weeks
         env.variables = variables
+
+
+_CHOICES: Final[tuple[Choice, ...]] = ("clock", "duration")
+
+
+def _parse_choices(blob: str) -> Choices:
+    try:
+        raw = json.loads(blob)
+        choices: dict[tuple[int, int], Choice] = {}
+        for start, end, choice in raw:
+            if choice not in _CHOICES or not isinstance(start, int) or not isinstance(end, int):
+                raise ValueError(f"bad choice {choice!r}")
+            choices[(start, end)] = choice
+    except (ValueError, TypeError) as error:
+        raise DtcalcError(f"choices are not usable: {error}") from error
+    return choices
 
 
 def _text(data: dict[str, Any], key: str) -> str:

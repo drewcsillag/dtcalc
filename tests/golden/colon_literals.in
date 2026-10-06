@@ -17,3 +17,9 @@ now - 12:15
 # An impossible clock reading is fine as a duration.
 now + 25:00
 25:00 in Tokyo
+
+# two bare colon literals joined by + or - are ambiguous
+2:11 - 1:29
+2:11 + 1:29
+2:11h - 1:29
+2:11 - 1:29h

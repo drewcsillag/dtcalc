@@ -114,6 +114,45 @@ h1 {
   color: var(--error);
 }
 
+/* The question put to the user when a line has two readings. */
+.chooser {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+}
+
+.chooser p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.chooser button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  color: var(--fg);
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 0.4rem;
+  cursor: pointer;
+}
+
+.chooser .choice-preview {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.chooser .choice-cancel {
+  align-self: flex-start;
+  border-color: var(--muted);
+  color: var(--muted);
+}
+
 #status {
   margin: 0;
   padding: 0.5rem 1rem;

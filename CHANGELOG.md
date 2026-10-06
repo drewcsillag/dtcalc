@@ -6,6 +6,15 @@ Notable changes to dtcalc. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- `2:11 - 1:29` (and `+`) is no longer silently read as a time of day less a
+  duration. Two bare colon literals joined by `+` or `-` are ambiguous, so
+  dtcalc now asks which reading is meant: interactively in the REPL and in the
+  browser, and with an error naming both spellings (`2:11 - 1:29h` or
+  `2:11h - 1:29`) anywhere else. Other colon expressions, such as
+  `12:15 + 3h` and `now - 1:29`, are unchanged.
+
 ### Added
 
 - **A browser version**, built from this same code with Pyodide and hosted on

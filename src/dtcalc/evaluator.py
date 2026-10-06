@@ -39,7 +39,7 @@ from dtcalc.errors import DtcalcError
 from dtcalc.functions import call_builtin
 from dtcalc.instant import Instant
 from dtcalc.parser import parse
-from dtcalc.resolve import resolve
+from dtcalc.resolve import Choices, resolve
 from dtcalc.values import Boolean, Number, Value
 from dtcalc.zones import resolve_zone
 
@@ -51,9 +51,12 @@ _DAYS_PER_WEEK: Final = 7
 _MAX_MONTHS_SEARCHED: Final = 120
 
 
-def evaluate_line(source: str, env: Env) -> Value:
-    """Parse, resolve and evaluate one line, updating ``env`` for assignments."""
-    tree = resolve(parse(source), env.types())
+def evaluate_line(source: str, env: Env, choices: Choices | None = None) -> Value:
+    """Parse, resolve and evaluate one line, updating ``env`` for assignments.
+
+    ``choices`` settles ambiguous colon literals; see :mod:`dtcalc.resolve`.
+    """
+    tree = resolve(parse(source), env.types(), choices)
     return evaluate(tree, env)
 
 

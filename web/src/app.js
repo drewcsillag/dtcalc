@@ -55,7 +55,7 @@ function restore(session, saved) {
   }
 }
 
-function addEntry(input, outcome, lines) {
+function startEntry(input) {
   const entry = document.createElement("div");
   entry.className = "entry";
 
@@ -66,14 +66,85 @@ function addEntry(input, outcome, lines) {
   echoed.setAttribute("role", "button");
   echoed.tabIndex = 0;
 
+  entry.append(echoed);
+  scrollback.append(entry);
+  scrollback.scrollTop = scrollback.scrollHeight;
+  return entry;
+}
+
+function showOutput(entry, outcome, lines) {
   const output = document.createElement("pre");
   output.className = outcome === "error" ? "output error" : "output";
   if (lines.length > 1) output.classList.add("block");
   output.textContent = lines.join("\n");
-
-  entry.append(echoed, output);
-  scrollback.append(entry);
+  entry.append(output);
   scrollback.scrollTop = scrollback.scrollHeight;
+}
+
+/**
+ * Put an ambiguity's readings to the user as buttons under the entry.
+ * Resolves to the chosen reading, or null if they cancel.
+ */
+function askWhich(entry, ambiguity) {
+  const chooser = document.createElement("div");
+  chooser.className = "chooser";
+  chooser.setAttribute("role", "group");
+  chooser.setAttribute("aria-label", "Which reading did you mean?");
+
+  const question = document.createElement("p");
+  question.textContent = "That could mean two things. Which did you mean?";
+  chooser.append(question);
+
+  return new Promise((resolve) => {
+    const done = (answer) => {
+      chooser.remove();
+      resolve(answer);
+    };
+    for (const option of ambiguity.options) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.choice = option.choice;
+      const label = document.createElement("span");
+      label.className = "choice-label";
+      label.textContent = option.label;
+      const spelling = document.createElement("code");
+      spelling.textContent = option.spelling;
+      button.append(label, spelling);
+      if (option.preview) {
+        const preview = document.createElement("span");
+        preview.className = "choice-preview";
+        preview.textContent = `= ${option.preview}`;
+        button.append(preview);
+      }
+      button.addEventListener("click", () => done(option.choice));
+      chooser.append(button);
+    }
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "choice-cancel";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", () => done(null));
+    chooser.append(cancel);
+
+    entry.append(chooser);
+    scrollback.scrollTop = scrollback.scrollHeight;
+    chooser.querySelector("button").focus();
+  });
+}
+
+/**
+ * Run a line, asking about each ambiguity in turn. Returns null if the user
+ * cancels, in which case the entry is withdrawn.
+ */
+async function runAsking(session, text, entry) {
+  const choices = [];
+  for (;;) {
+    const reply = session.runLine(text, choices);
+    if (reply.ambiguity === null) return reply;
+    const answer = await askWhich(entry, reply.ambiguity);
+    if (answer === null) return null;
+    choices.push([...reply.ambiguity.key, answer]);
+  }
 }
 
 function wireEditing(session) {
@@ -146,16 +217,30 @@ function wire(session, refreshSuggestions, saved, storage) {
   let position = history.length;
   let draft = "";
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const text = line.value;
     line.value = "";
 
-    const [outcome, lines] = session.run(text);
-    if (outcome !== "nothing") {
-      addEntry(text, outcome, outcome === "quit" ? [QUIT_NOTE] : lines);
-      if (history.at(-1) !== text) history.push(text);
-      save(storage, { history, state: session.exportState() });
+    // Anything blank is a no-op; don't echo it.
+    const entry = text.trim() === "" ? null : startEntry(text);
+    if (entry !== null) {
+      line.disabled = true;
+      let reply;
+      try {
+        reply = await runAsking(session, text, entry);
+      } finally {
+        line.disabled = false;
+        line.focus();
+      }
+      if (reply === null) {
+        entry.remove();
+      } else {
+        const { outcome, lines } = reply;
+        showOutput(entry, outcome, outcome === "quit" ? [QUIT_NOTE] : lines);
+        if (history.at(-1) !== text) history.push(text);
+        save(storage, { history, state: session.exportState() });
+      }
     }
     position = history.length;
     draft = "";

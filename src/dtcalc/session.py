@@ -10,7 +10,7 @@ lines to print, which is what makes it testable without a terminal.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum, auto
 from typing import Final
 
@@ -20,10 +20,11 @@ from dtcalc.errors import DtcalcError
 from dtcalc.evaluator import evaluate_line
 from dtcalc.format import CLOCKS, FORMATS, GROUPINGS, Style, format_value, render
 from dtcalc.lexer import is_meta_command, tokenize
+from dtcalc.resolve import AmbiguousColonError, Choice, Choices
 from dtcalc.values import kind_of
 from dtcalc.zones import resolve_zone, search_zones
 
-__all__ = ["Outcome", "Result", "execute_line", "help_text"]
+__all__ = ["Ambiguity", "AmbiguityOption", "Outcome", "Result", "execute_line", "help_text"]
 
 _MAX_LISTED_ZONES: Final = 30
 
@@ -38,17 +39,43 @@ class Outcome(Enum):
 
 
 @dataclass(frozen=True, slots=True)
+class AmbiguityOption:
+    """One way to read an ambiguous line, for a front end that can ask."""
+
+    choice: Choice
+    label: str
+    spelling: str
+    # The value this reading gives, or None when it cannot be shown, either
+    # because it fails or because the line has a further ambiguity.
+    preview: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class Ambiguity:
+    """An ambiguous operator: ``key`` is where to supply the chosen ``Choice``."""
+
+    key: tuple[int, int]
+    options: tuple[AmbiguityOption, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class Result:
     outcome: Outcome
     lines: tuple[str, ...] = ()
+    ambiguity: Ambiguity | None = None
 
     @property
     def failed(self) -> bool:
         return self.outcome is Outcome.ERROR
 
 
-def execute_line(line: str, env: Env, style: Style) -> Result:
-    """Run one input line against ``env``, which it may mutate."""
+def execute_line(line: str, env: Env, style: Style, choices: Choices | None = None) -> Result:
+    """Run one input line against ``env``, which it may mutate.
+
+    An ambiguous colon literal is an error whose :class:`Result` also carries
+    the :class:`Ambiguity`, so a front end can ask and run the line again with
+    ``choices``.
+    """
     if is_meta_command(line):
         return _meta(line.strip(), env, style)
 
@@ -59,7 +86,13 @@ def execute_line(line: str, env: Env, style: Style) -> Result:
         return Result(Outcome.ERROR, (style.error(error.render(line)),))
 
     try:
-        value = evaluate_line(line, env)
+        value = evaluate_line(line, env, choices)
+    except AmbiguousColonError as error:
+        return Result(
+            Outcome.ERROR,
+            (style.error(error.render(line)),),
+            _ambiguity(line, error, env, choices or {}),
+        )
     except DtcalcError as error:
         return Result(Outcome.ERROR, (style.error(error.render(line)),))
 
@@ -67,6 +100,35 @@ def execute_line(line: str, env: Env, style: Style) -> Result:
     # The value is coloured; an advisory note is left plain, since it is
     # commentary rather than the answer.
     return Result(Outcome.OK, (style.result(rendered[0]), *rendered[1:]))
+
+
+def _ambiguity(line: str, error: AmbiguousColonError, env: Env, choices: Choices) -> Ambiguity:
+    readings: tuple[tuple[Choice, str, str], ...] = (
+        ("clock", "a time of day and a duration", error.clock_spelling),
+        (
+            "duration",
+            f"two durations ({error.left_duration} {error.op} {error.right_duration})",
+            error.duration_spelling,
+        ),
+    )
+    return Ambiguity(
+        error.span,
+        tuple(
+            AmbiguityOption(
+                choice, label, spelling, _preview(line, env, {**choices, error.span: choice})
+            )
+            for choice, label, spelling in readings
+        ),
+    )
+
+
+def _preview(line: str, env: Env, choices: Choices) -> str | None:
+    """What the line gives under ``choices``, without touching the session."""
+    scratch = replace(env, variables=dict(env.variables))
+    try:
+        return render(evaluate_line(line, scratch, choices), env.display())[0]
+    except DtcalcError:
+        return None
 
 
 # --------------------------------------------------------------------------
@@ -213,7 +275,8 @@ def help_text() -> list[str]:
         "            12p is noon)",
         "durations   3w2h5m, 250ms, 1.5s, 3bd  (ms s m h | d w | mo y | bd)",
         "colon forms 12:15 is 12h15m or 12:15:00 depending on context;",
-        "            12:15m is 12m15s, :12:15 is 12m15s, ::15 is 15s",
+        "            12:15m is 12m15s, :12:15 is 12m15s, ::15 is 15s;",
+        "            2:11 - 1:29 is ambiguous, so say 2:11h - 1:29 or 2:11 - 1:29h",
         "operators   + - * / %, comparisons, in (show in a zone)",
         "            @ attaches a zone (12:13 @ sf) or a time (foo @ 4p, which",
         "            keeps foo's date and changes the time)",

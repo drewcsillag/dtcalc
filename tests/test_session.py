@@ -364,3 +364,61 @@ def test_the_working_zone_changes_what_today_means(env: Env) -> None:
 
 def test_help_calls_it_the_working_zone() -> None:
     assert any("working zone" in line for line in help_text())
+
+
+# --------------------------------------------------------------------------
+# ambiguous colon literals
+# --------------------------------------------------------------------------
+
+
+def test_an_ambiguous_line_is_an_error_naming_both_spellings(env: Env) -> None:
+    outcome, lines = run(env, "2:11 - 1:29")
+    text = "\n".join(lines)
+    assert outcome is Outcome.ERROR
+    assert "ambiguous" in text
+    assert "2:11 - 1:29h" in text
+    assert "2:11h - 1:29" in text
+
+
+def test_an_ambiguous_line_carries_the_options_with_previews(env: Env) -> None:
+    result = execute_line("2:11 - 1:29", env, PLAIN)
+    ambiguity = result.ambiguity
+    assert ambiguity is not None
+    assert ambiguity.key == (0, 11)
+    assert [(o.choice, o.spelling, o.preview) for o in ambiguity.options] == [
+        ("clock", "2:11 - 1:29h", "2026-05-23T00:42:00-04:00  America/New_York"),
+        ("duration", "2:11h - 1:29", "42m"),
+    ]
+
+
+def test_other_results_have_no_ambiguity(env: Env) -> None:
+    assert execute_line("1h + 1h", env, PLAIN).ambiguity is None
+    assert execute_line("now +", env, PLAIN).ambiguity is None
+
+
+def test_a_choice_settles_the_ambiguity(env: Env) -> None:
+    result = execute_line("2:11 - 1:29", env, PLAIN, {(0, 11): "duration"})
+    assert (result.outcome, result.lines) == (Outcome.OK, ("42m",))
+    result = execute_line("2:11 - 1:29", env, PLAIN, {(0, 11): "clock"})
+    assert result.lines == ("2026-05-23T00:42:00-04:00  America/New_York",)
+
+
+def test_previewing_an_assignment_does_not_assign(env: Env) -> None:
+    result = execute_line("x = 2:11 - 1:29", env, PLAIN)
+    assert result.ambiguity is not None
+    assert [o.preview for o in result.ambiguity.options] == [
+        "2026-05-23T00:42:00-04:00  America/New_York",
+        "42m",
+    ]
+    assert "x" not in env.variables
+
+
+def test_a_preview_that_meets_the_next_ambiguity_has_no_value(env: Env) -> None:
+    result = execute_line("max(2:11 - 1:29, 3:00 - 1:00)", env, PLAIN)
+    assert result.ambiguity is not None
+    assert [o.preview for o in result.ambiguity.options] == [None, None]
+    key = result.ambiguity.key
+    second = execute_line("max(2:11 - 1:29, 3:00 - 1:00)", env, PLAIN, {key: "duration"})
+    assert second.ambiguity is not None
+    assert second.ambiguity.key != key
+    assert [o.preview for o in second.ambiguity.options][1] == "2h"

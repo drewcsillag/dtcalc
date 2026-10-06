@@ -67,6 +67,14 @@ function wrap(session) {
   return {
     /** @returns {[string, string[]]} outcome name and output lines */
     run: (line) => plain(session.run(line)),
+    /**
+     * Run a line that may be ambiguous. `choices` are the answers given so
+     * far, as `[start, end, "clock" | "duration"]`; `ambiguity` in the reply is
+     * null, or the next question: `{key: [start, end], options: [{choice,
+     * label, spelling, preview}]}`.
+     * @returns {{outcome: string, lines: string[], ambiguity: object | null}}
+     */
+    runLine: (line, choices = []) => JSON.parse(session.run_line(line, JSON.stringify(choices))),
     complete: (line, cursor = line.length) => plain(session.complete(line, cursor)),
     setNow: (nowMs) => session.set_now(millis(nowMs)),
     exportState: () => session.export_state(),

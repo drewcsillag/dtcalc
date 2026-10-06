@@ -33,3 +33,21 @@ dtcalc> 25:00 in Tokyo
 error: '25:00' is not a time of day
   25:00 in Tokyo
   ^^^^^
+dtcalc> 
+dtcalc> # two bare colon literals joined by + or - are ambiguous
+dtcalc> 2:11 - 1:29
+error: 2:11 - 1:29 is ambiguous: a time of day less a duration, or two durations
+  2:11 - 1:29
+  ^^^^^^^^^^^
+  as a time of day and a duration: 2:11 - 1:29h
+  as two durations (2h11m - 1h29m): 2:11h - 1:29
+dtcalc> 2:11 + 1:29
+error: 2:11 + 1:29 is ambiguous: a time of day plus a duration, or two durations
+  2:11 + 1:29
+  ^^^^^^^^^^^
+  as a time of day and a duration: 2:11 + 1:29h
+  as two durations (2h11m + 1h29m): 2:11h + 1:29
+dtcalc> 2:11h - 1:29
+42m
+dtcalc> 2:11 - 1:29h
+2026-05-23T00:42:00-04:00  America/New_York

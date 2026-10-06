@@ -47,6 +47,11 @@ class TestRun:
     def test_quit_is_reported_not_acted_on(self, session: WebSession) -> None:
         assert session.run(":q") == ("quit", [])
 
+    def test_an_ambiguous_line_is_an_error_naming_both_spellings(self, session: WebSession) -> None:
+        outcome, lines = session.run("2:11 - 1:29")
+        assert outcome == "error"
+        assert any("2:11h - 1:29" in text for text in lines)
+
     def test_variables_persist_between_lines(self, session: WebSession) -> None:
         session.run("foo = now")
         _, lines = session.run("foo + 1h - foo")
@@ -192,3 +197,31 @@ class TestState:
             session.import_state(blob)
         assert session.run("keep")[1] == ["1h"]
         assert session.run(":tz")[1] == ["working zone is America/New_York"]
+
+
+class TestRunLine:
+    """The chooser's entry point: JSON in, JSON out, so JS needs no proxies."""
+
+    def test_an_ordinary_line_has_no_ambiguity(self, session: WebSession) -> None:
+        reply = json.loads(session.run_line("1h + 1h"))
+        assert reply == {"outcome": "ok", "lines": ["2h"], "ambiguity": None}
+
+    def test_an_ambiguous_line_offers_both_readings(self, session: WebSession) -> None:
+        reply = json.loads(session.run_line("2:11 - 1:29"))
+        assert reply["outcome"] == "error"
+        ambiguity = reply["ambiguity"]
+        assert [option["choice"] for option in ambiguity["options"]] == ["clock", "duration"]
+        assert [option["preview"] for option in ambiguity["options"]] == [
+            "2026-05-23T00:42:00-04:00  America/New_York",
+            "42m",
+        ]
+        assert ambiguity["key"] == [0, 11]
+
+    def test_a_choice_settles_it(self, session: WebSession) -> None:
+        choices = json.dumps([[0, 11, "duration"]])
+        reply = json.loads(session.run_line("2:11 - 1:29", choices))
+        assert reply == {"outcome": "ok", "lines": ["42m"], "ambiguity": None}
+
+    def test_a_malformed_choice_list_is_an_error_not_a_crash(self, session: WebSession) -> None:
+        with pytest.raises(DtcalcError):
+            session.run_line("2:11 - 1:29", "nonsense")

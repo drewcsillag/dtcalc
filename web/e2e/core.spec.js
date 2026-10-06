@@ -126,3 +126,40 @@ test("a single-line result wraps instead of being cut off", async ({ page }) => 
   const clipped = await output.evaluate((el) => el.scrollWidth - el.clientWidth);
   expect(clipped).toBeLessThanOrEqual(0);
 });
+
+test("an ambiguous line asks which reading is meant and then answers", async ({ page }) => {
+  await openCalculator(page);
+  await submit(page, "2:11 - 1:29");
+  const chooser = page.locator("#scrollback .chooser");
+  await expect(chooser.locator("button[data-choice]")).toHaveCount(2);
+  await expect(chooser.locator('button[data-choice="duration"]')).toContainText("42m");
+  await chooser.locator('button[data-choice="duration"]').click();
+  const entry = page.locator("#scrollback .entry").last();
+  await expect(entry.locator(".output")).toHaveText("42m");
+  await expect(chooser).toHaveCount(0);
+});
+
+test("the clock reading can be chosen instead", async ({ page }) => {
+  await openCalculator(page);
+  await submit(page, "2:11 - 1:29");
+  await page.locator('#scrollback .chooser button[data-choice="clock"]').click();
+  await expect(page.locator("#scrollback .entry").last().locator(".output")).toHaveText(
+    "2026-05-23T00:42:00-04:00  America/New_York",
+  );
+});
+
+test("cancelling the question withdraws the line", async ({ page }) => {
+  await openCalculator(page);
+  await submit(page, "2:11 - 1:29");
+  await page.locator("#scrollback .chooser .choice-cancel").click();
+  await expect(page.locator("#scrollback .entry")).toHaveCount(0);
+  await expect(page.locator("#line")).toBeEnabled();
+});
+
+test("each ambiguity in a line is asked in turn", async ({ page }) => {
+  await openCalculator(page);
+  await submit(page, "max(2:11 - 1:29, 3:00 - 1:00)");
+  await page.locator('#scrollback .chooser button[data-choice="duration"]').click();
+  await page.locator('#scrollback .chooser button[data-choice="duration"]').click();
+  await expect(page.locator("#scrollback .entry").last().locator(".output")).toHaveText("2h");
+});
